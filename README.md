@@ -8,7 +8,7 @@ API para gestão de eventos e allotments construída com NestJS, Prisma 7 e Post
 - Docker e Docker Compose
 - npm
 
-## Setup
+## Desenvolvimento local
 
 ### 1. Clonar e instalar dependências
 
@@ -31,7 +31,7 @@ O `.env` já está pré-configurado para o banco Docker local. Edite se necessá
 ### 3. Subir o banco de dados
 
 ```bash
-docker-compose up -d
+docker-compose --profile local up -d
 ```
 
 ### 4. Executar as migrações
@@ -43,10 +43,26 @@ npx prisma migrate deploy
 ### 5. Iniciar a aplicação
 
 ```bash
-# Desenvolvimento (watch mode)
 npm run start:dev
+```
 
-# Produção
+## Produção com Docker
+
+Sobe o banco e a API em containers, com migração automática na inicialização.
+
+```bash
+docker-compose --profile prod up -d
+```
+
+Para rebuild da imagem da API após alterações:
+
+```bash
+docker-compose --profile prod up -d --build
+```
+
+## Build manual
+
+```bash
 npm run build
 npm run start:prod
 ```
