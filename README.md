@@ -69,9 +69,9 @@ npm run start:prod
 
 ## Endpoints
 
-- **Swagger UI**: `http://localhost:3000/docs`
-- **Health check**: `http://localhost:3000/health`
-- **API base**: `http://localhost:3000/api/v1`
+- **Swagger UI**: `http://localhost:3333/docs`
+- **Health check**: `http://localhost:3333/health`
+- **API base**: `http://localhost:3333/api/v1`
 
 ## Variáveis de ambiente
 
