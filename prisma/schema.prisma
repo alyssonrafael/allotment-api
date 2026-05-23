@@ -1,0 +1,44 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AllotmentStatus {
+  AVAILABLE
+  RESERVED
+  SOLD
+  BLOCKED
+}
+
+model Event {
+  id             String      @id @default(uuid())
+  name           String
+  date           DateTime
+  pavilionName   String
+  pavilionWidth  Float
+  pavilionHeight Float
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  allotments     Allotment[]
+}
+
+model Allotment {
+  id        String          @id @default(uuid())
+  name      String
+  code      String
+  x         Float
+  y         Float
+  width     Float
+  height    Float
+  status    AllotmentStatus @default(AVAILABLE)
+  price     Float
+  eventId   String
+  event     Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+
+  @@unique([eventId, code])
+}

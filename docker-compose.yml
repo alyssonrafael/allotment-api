@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: allotment_db
+    environment:
+      POSTGRES_USER: allotment_user
+      POSTGRES_PASSWORD: allotment_pass
+      POSTGRES_DB: allotment_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
