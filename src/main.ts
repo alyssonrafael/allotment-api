@@ -7,6 +7,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',');
+  app.enableCors({ origin: allowedOrigins, credentials: true });
+
   const prefix = process.env.API_PREFIX ?? 'api/v1';
   app.setGlobalPrefix(prefix, { exclude: ['health'] });
 

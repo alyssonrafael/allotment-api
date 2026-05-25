@@ -13,16 +13,64 @@ enum AllotmentStatus {
   BLOCKED
 }
 
+enum ActivityType {
+  CREATED
+  UPDATED
+  DELETED
+  SOLD
+  RESERVED
+  BLOCKED
+  AVAILABLE
+}
+
+enum EventType {
+  FEIRA
+  CONGRESSO
+  EXPO
+  CORPORATE
+}
+
+model Venue {
+  id           String   @id @default(uuid())
+  name         String
+  description  String?
+  width        Float
+  height       Float
+  city         String
+  state        String
+  street       String?
+  neighborhood String?
+  zipCode      String?
+  accent       String
+  photo        String
+  events       Event[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
 model Event {
-  id             String      @id @default(uuid())
-  name           String
-  date           DateTime
-  pavilionName   String
-  pavilionWidth  Float
-  pavilionHeight Float
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-  allotments     Allotment[]
+  id               String           @id @default(uuid())
+  name             String
+  type             EventType
+  startDate        DateTime
+  endDate          DateTime
+  venueId          String
+  venue            Venue            @relation(fields: [venueId], references: [id])
+  canvasWidth      Float
+  canvasHeight     Float
+  allotments       Allotment[]
+  recentActivities RecentActivity[]
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+}
+
+model RecentActivity {
+  id        String       @id @default(uuid())
+  eventId   String
+  event     Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  action    String
+  type      ActivityType
+  createdAt DateTime     @default(now())
 }
 
 model Allotment {

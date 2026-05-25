@@ -1,27 +1,38 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsNumber, IsPositive, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EventType } from '@prisma/client';
+import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
 
 export class CreateEventDto {
-  @ApiProperty({ example: 'ExpoTech 2025' })
+  @ApiProperty({ example: 'Expo Tech 2025' })
   @IsString()
   @MinLength(3)
   name!: string;
 
-  @ApiProperty({ example: '2025-09-15T10:00:00.000Z' })
+  @ApiProperty({ enum: EventType, example: EventType.FEIRA })
+  @IsEnum(EventType)
+  type!: EventType;
+
+  @ApiProperty({ example: '2025-09-11T00:00:00.000Z' })
   @IsDateString()
-  date!: string;
+  startDate!: string;
 
-  @ApiProperty({ example: 'Pavilhão A' })
-  @IsString()
-  pavilionName!: string;
+  @ApiProperty({ example: '2025-09-14T00:00:00.000Z' })
+  @IsDateString()
+  endDate!: string;
 
-  @ApiProperty({ example: 100.5 })
+  @ApiProperty({ example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890' })
+  @IsUUID()
+  venueId!: string;
+
+  @ApiPropertyOptional({ example: 80, description: 'Sobrescreve a largura do venue (área parcial)' })
+  @IsOptional()
   @IsNumber()
-  @IsPositive()
-  pavilionWidth!: number;
+  @Min(1)
+  canvasWidth?: number;
 
-  @ApiProperty({ example: 50.0 })
+  @ApiPropertyOptional({ example: 50, description: 'Sobrescreve a altura do venue (área parcial)' })
+  @IsOptional()
   @IsNumber()
-  @IsPositive()
-  pavilionHeight!: number;
+  @Min(1)
+  canvasHeight?: number;
 }
