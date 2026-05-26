@@ -8,6 +8,13 @@ import { UpdateAllotmentDto } from './dto/update-allotment.dto';
 import { UpdateAllotmentPositionDto } from './dto/update-allotment-position.dto';
 import { UpdateAllotmentStatusDto } from './dto/update-allotment-status.dto';
 
+const STATUS_LABELS: Record<string, string> = {
+  AVAILABLE: 'Disponível',
+  RESERVED: 'Reservado',
+  SOLD: 'Vendido',
+  BLOCKED: 'Bloqueado',
+};
+
 @Injectable()
 export class AllotmentsService {
   constructor(
@@ -87,7 +94,8 @@ export class AllotmentsService {
     const allotment = await this.findOne(id);
     const updated = await this.prisma.allotment.update({ where: { id }, data: dto });
     const activityType = ActivityType[dto.status as keyof typeof ActivityType];
-    await this.activitiesService.log(allotment.eventId, `Lote "${allotment.code}" passou para ${dto.status}`, activityType);
+    const statusLabel = STATUS_LABELS[dto.status] || dto.status;
+    await this.activitiesService.log(allotment.eventId, `Lote "${allotment.code}" passou para ${statusLabel}`, activityType);
     return updated;
   }
 
