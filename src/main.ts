@@ -14,10 +14,12 @@ async function bootstrap() {
   app.setGlobalPrefix(prefix, { exclude: ['health'] });
 
   if (process.env.SWAGGER_ENABLED === 'true') {
+    const serverUrl = process.env.API_URL ?? `http://localhost:${process.env.PORT ?? 3333}`;
     const config = new DocumentBuilder()
       .setTitle('Allotment API')
       .setDescription('API para gestão de eventos e allotments')
       .setVersion('1.0')
+      .addServer(serverUrl)
       .build();
 
     const document = SwaggerModule.createDocument(app, config);
