@@ -8,7 +8,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly pool: Pool;
 
   constructor() {
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? true : undefined,
+    });
     super({ adapter: new PrismaPg(pool) });
     this.pool = pool;
   }
