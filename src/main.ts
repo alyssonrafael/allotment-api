@@ -11,7 +11,11 @@ async function bootstrap() {
   app.enableCors({ origin: allowedOrigins, credentials: true });
 
   const prefix = process.env.API_PREFIX ?? 'api/v1';
-  app.setGlobalPrefix(prefix, { exclude: ['health'] });
+  app.setGlobalPrefix(prefix);
+
+  // alias /health para UptimeRobot e Docker healthcheck
+  const http = app.getHttpAdapter().getInstance();
+  http.get('/health', (_req: unknown, res: { json: (body: unknown) => void }) => res.json({ status: 'ok' }));
 
   if (process.env.SWAGGER_ENABLED === 'true') {
     const serverUrl = process.env.API_URL ?? `http://localhost:${process.env.PORT ?? 3333}`;
