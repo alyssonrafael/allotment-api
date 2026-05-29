@@ -47,11 +47,13 @@ function generateCode(index: number): string {
 }
 
 // Dimensões válidas: números inteiros em metros e mínimo 1.
-function isValidDimension(value: number): boolean {
+function isValidDimension(value: number | undefined | null): boolean {
+  if (typeof value !== 'number') return false;
   return value >= 1 && Number.isInteger(value);
 }
 
-function normalizeDimension(value: number): number {
+function normalizeDimension(value: number | undefined | null): number {
+  if (typeof value !== 'number' || isNaN(value)) return 1;
   return Math.max(1, Math.round(value));
 }
 
@@ -62,22 +64,25 @@ function normalizeGroups(
   warnings: string[],
 ): StandGroup[] {
   return groups.map((group) => {
-    const parts: string[] = [];
     let width = group.width;
     let height = group.height;
+    const parts: string[] = [];
 
+    // Se não for válido (ex: 2.5), forçamos o arredondamento
     if (!isValidDimension(width)) {
       const adjusted = normalizeDimension(width);
-      parts.push(`${width}m ajustada para ${adjusted}m`);
+      parts.push(`largura ${width}m ajustada para ${adjusted}m`);
       width = adjusted;
     }
+    
     if (!isValidDimension(height)) {
       const adjusted = normalizeDimension(height);
-      parts.push(`${height}m ajustada para ${adjusted}m`);
+      parts.push(`profundidade ${height}m ajustada para ${adjusted}m`);
       height = adjusted;
     }
+
     if (parts.length > 0) {
-      warnings.push(`Dimensão ${parts.join(' e ')} (o sistema aceita apenas medidas inteiras em metros).`);
+      warnings.push(`Medida fracionada corrigida: ${parts.join(' e ')}. O sistema usa apenas metros inteiros absolutos.`);
     }
 
     return { ...group, width, height };

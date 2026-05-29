@@ -43,6 +43,13 @@ uma mensagem educada em "assistantMessage" redirecionando para o assunto, manten
 Exemplo de assistantMessage: "Só consigo ajudar com a criação de pavilhões e eventos.
 Voltando: [próxima pergunta necessária]"`;
 
+const DIMENSION_RULE = `MEDIDAS ABSOLUTAS (OBRIGATÓRIO):
+- TODAS as dimensões de largura (width) e comprimento/altura (height) DEVEM ser obrigatoriamente números INTEIROS.
+- NUNCA use números decimais/fracionados (ex: 2.5, 3.1, 0.5, 1.7).
+- Se o usuário informar uma medida quebrada (ex: "stands de 2,5m"), ARREDONDE imediatamente para o inteiro mais próximo (ex: 3).
+- O valor mínimo aceitável é sempre 1.
+- Apenas valores como 1, 2, 3, 4, 5, 10, 20... são válidos.`;
+
 function buildDateRule(currentDate: string): string {
   return `DATAS — Interpretação em português (hoje é ${currentDate}):
 - Converta qualquer expressão de data para ISO 8601 usando SEMPRE "T12:00:00.000Z" como horário.
@@ -95,6 +102,8 @@ CORES — Presets disponíveis (use o mais próximo do que o usuário pediu):
 Se nenhuma cor for mencionada, use "azul".
 
 Para state, use a sigla UF de 2 letras (ex: "SP", "RJ", "MG").
+
+${DIMENSION_RULE}
 
 ${buildDateRule(currentDate)}
 
@@ -158,12 +167,7 @@ O usuário pode especificar de qual canto ou ponto os stands começam a ser dist
   "centro", "centralizado", "no meio"            → startCorner: "center"
 Se não for mencionado, use startCorner: null (equivale a "top-left").
 
-DIMENSÕES DOS STANDS:
-- Todas as dimensões (width e height) DEVEM ser números inteiros em metros e no mínimo 1.
-- Valores válidos: 1, 2, 3, 4, 5, 6, 8, 10...
-- NUNCA use valores fracionados como 1.7, 2.3, 0.5, 3.1, 5.5.
-- Se o usuário pedir "stands de 5,1m", arredonde para 5; "5,6m" arredonde para 6.
-- Se o usuário não especificar tamanho, use 3x3 como padrão.
+${DIMENSION_RULE}
 
 ${EVENT_TYPE_RULE}
 
@@ -256,6 +260,9 @@ export class AiService {
         'Não foi possível extrair dimensões válidas do pavilhão a partir do prompt',
       );
     }
+
+    raw.venue.width = Math.max(1, Math.round(raw.venue.width));
+    raw.venue.height = Math.max(1, Math.round(raw.venue.height));
 
     if (raw.suggestedEvent) {
       const start = new Date(raw.suggestedEvent.startDate);
