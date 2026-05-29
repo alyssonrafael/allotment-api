@@ -45,8 +45,11 @@ Voltando: [próxima pergunta necessária]"`;
 
 function buildDateRule(currentDate: string): string {
   return `DATAS — Interpretação em português (hoje é ${currentDate}):
-- Converta qualquer expressão de data para ISO 8601 UTC: "YYYY-MM-DDTHH:00:00.000Z".
-- "de 5 a 10 de maio" → startDate "YYYY-05-05T00:00:00.000Z", endDate "YYYY-05-10T00:00:00.000Z"
+- Converta qualquer expressão de data para ISO 8601 usando SEMPRE "T12:00:00.000Z" como horário.
+  Exemplos corretos: "2026-08-10T12:00:00.000Z", "2026-03-15T12:00:00.000Z"
+  NUNCA use T00:00:00.000Z — causa erro de fuso horário no Brasil (UTC-3), fazendo a data aparecer um dia antes.
+- "10/08/2026 a 15/08/2026" → startDate "2026-08-10T12:00:00.000Z", endDate "2026-08-15T12:00:00.000Z"
+- "de 5 a 10 de maio" → startDate "YYYY-05-05T12:00:00.000Z", endDate "YYYY-05-10T12:00:00.000Z"
 - "março", "em março" → sem ano explícito, use o próximo mês de março a partir de hoje.
 - "mês que vem" → primeiro ao último dia do próximo mês.
 - "semana que vem" / "próxima semana" → segunda a domingo da próxima semana.
