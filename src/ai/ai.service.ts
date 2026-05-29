@@ -21,6 +21,7 @@ import {
   RawParseEventResponse,
 } from './dto/parse-event.dto';
 import { runLayout } from './layout.engine';
+import { normalizeDimension } from './dimension.util';
 import type { ChatMessage, LlmProvider } from './llm/llm-provider.interface';
 import { LLM_PROVIDER } from './llm/llm-provider.interface';
 
@@ -43,12 +44,14 @@ uma mensagem educada em "assistantMessage" redirecionando para o assunto, manten
 Exemplo de assistantMessage: "Só consigo ajudar com a criação de pavilhões e eventos.
 Voltando: [próxima pergunta necessária]"`;
 
-const DIMENSION_RULE = `MEDIDAS ABSOLUTAS (OBRIGATÓRIO):
-- TODAS as dimensões de largura (width) e comprimento/altura (height) DEVEM ser obrigatoriamente números INTEIROS.
-- NUNCA use números decimais/fracionados (ex: 2.5, 3.1, 0.5, 1.7).
-- Se o usuário informar uma medida quebrada (ex: "stands de 2,5m"), ARREDONDE imediatamente para o inteiro mais próximo (ex: 3).
-- O valor mínimo aceitável é sempre 1.
-- Apenas valores como 1, 2, 3, 4, 5, 10, 20... são válidos.`;
+const DIMENSION_RULE = `MEDIDAS — REGRA ABSOLUTA (INEGOCIÁVEL):
+- width (largura) e height (comprimento/profundidade) de QUALQUER stand ou pavilhão DEVEM ser números INTEIROS >= 1.
+- NUNCA, em hipótese alguma, emita decimais/frações (ex: 2.5, 3.1, 0.5, 1.7) — nem mesmo se o usuário insistir.
+- Se o usuário informar uma medida quebrada ("2,5m", "dois e meio", "3.1"), NÃO bloqueie e NÃO pergunte:
+  ARREDONDE para o inteiro mais próximo (mínimo 1) e siga normalmente. O sistema mostrará o ajuste ao usuário para ele confirmar.
+- Arredondamento = inteiro mais próximo (0,5 arredonda para cima): 2.4→2, 2.5→3, 3.1→3, 0.5→1, 0→1.
+- count (quantidade de stands de um grupo) também é INTEIRO >= 1.
+- Valores válidos: 1, 2, 3, 4, 5, 10, 20... Decimais são SEMPRE inválidos.`;
 
 function buildDateRule(currentDate: string): string {
   return `DATAS — Interpretação em português (hoje é ${currentDate}):
@@ -136,27 +139,49 @@ PASSO 1 — Colete os dados obrigatórios do evento: name, type, startDate, endD
 
 PASSO 2 — Quando os 4 dados do evento estiverem disponíveis:
   - Se o usuário JÁ informou dados de stands (quantidade, tamanho ou qualquer menção a lotes)
-    no prompt atual ou no histórico → vá direto para o PASSO 3a. NÃO pergunte sobre stands.
+    no prompt atual ou no histórico → vá para o PASSO 3a.
   - Se o usuário NÃO mencionou nada sobre stands nem dispensou → retorne "needs_info" com:
       questions: ["Deseja adicionar lotes/stands agora?"]
       assistantMessage: "Ótimo! Evento configurado. Deseja adicionar lotes/stands agora?
-        Se sim, me diga quantos e os tamanhos (ex: 10 stands de 3x3).
+        Se sim, me diga quantos, os tamanhos e o valor padrão por stand (ex: 10 stands de 3x3 a R$ 1500).
         Se preferir fazer depois, o evento será criado sem stands."
 
 PASSO 3a — Usuário informou stands (quantidade e tamanho disponíveis):
-  Retorne "complete" com layoutIntent preenchido.
+  - O VALOR PADRÃO por stand (basePrice) é OBRIGATÓRIO para criar stands.
+  - Se o usuário informou um valor/preço (ex: "a R$ 1500", "1000 cada", "valor 800") → preencha basePrice e retorne "complete".
+  - Se o usuário NÃO informou o valor → retorne "needs_info" pedindo APENAS o preço:
+      questions: ["Qual o valor padrão de cada stand? (ex: 1000)"]
+      assistantMessage: "Quase lá! Para criar os stands preciso de um valor padrão por stand (ex: R$ 1.000). Você poderá ajustar individualmente depois."
+  - NUNCA invente o valor: sem preço informado, jamais retorne "complete" com stands.
 
 PASSO 3b — Usuário dispensou stands ("não", "depois", "sem stands", "só o evento"):
   Retorne "complete" com layoutIntent: null.
 
 Dados OBRIGATÓRIOS do evento (nunca invente): name, type, startDate, endDate.
 Stands são OPCIONAIS — nunca invente grupos de stands se o usuário não informou.
+Mas SE houver stands, o valor padrão por stand (basePrice) passa a ser OBRIGATÓRIO — nunca o invente.
 
 Quando status for "complete" COM stands, retorne layoutIntent com:
 - groups: lista de grupos de stands
-- Valores padrão para corredores se não mencionados:
-  corridorH: 2 (metros), corridorV: 1.5 (metros)
-  mainCorridorH: null, mainCorridorV: null, basePrice: null
+- basePrice: o valor padrão por stand informado pelo usuário (número > 0; NUNCA null quando há stands)
+
+TAMANHOS DIFERENTES — múltiplos grupos:
+- Cada tamanho distinto de stand é UM grupo separado no array "groups", com seu próprio width, height e count.
+- Ex: "10 stands de 3x3 e 5 stands de 2x2" → groups: [{width:3,height:3,count:10,...}, {width:2,height:2,count:5,...}].
+- NUNCA misture tamanhos diferentes no mesmo grupo. Pode haver quantos grupos forem necessários.
+- O basePrice é único e vale para TODOS os stands, independentemente do tamanho.
+
+ESPAÇAMENTO / CORREDORES — como extrair do pedido do usuário:
+- corridorV = espaço (metros) entre stands lado a lado, na MESMA fileira.
+- corridorH = espaço (metros) entre FILEIRAS (uma fileira e a de baixo).
+- Espaçamento genérico ("2m entre os stands", "corredores de 2 metros", "deixe 1m de espaço")
+  → aplique o MESMO valor a corridorV E corridorH.
+- Direções separadas ("2m entre fileiras e 1m entre stands") → corridorH:2, corridorV:1.
+- "Sem espaço"/"stands encostados" → corridorH:0, corridorV:0.
+- Corredores DEVEM ser INTEIROS >= 0 (mesma regra das medidas; arredonde decimais).
+- Padrão se não mencionado: corridorH:2, corridorV:2.
+- mainCorridorH / mainCorridorV: corredor central mais largo (entre as duas metades do canvas).
+  Use só se o usuário pedir explicitamente "corredor central"/"corredor principal"; senão, null.
 
 POSICIONAMENTO DOS STANDS — startCorner:
 O usuário pode especificar de qual canto ou ponto os stands começam a ser distribuídos:
@@ -243,7 +268,7 @@ export class AiService {
 
     const raw = (await this.llm.complete(
       messages,
-      PARSE_VENUE_SCHEMA as Record<string, unknown>,
+      PARSE_VENUE_SCHEMA,
     )) as RawParseVenueResponse;
 
     if (raw.status === 'needs_info') {
@@ -261,8 +286,21 @@ export class AiService {
       );
     }
 
-    raw.venue.width = Math.max(1, Math.round(raw.venue.width));
-    raw.venue.height = Math.max(1, Math.round(raw.venue.height));
+    const warnings: string[] = [];
+    const normalizedWidth = normalizeDimension(raw.venue.width);
+    if (normalizedWidth !== raw.venue.width) {
+      warnings.push(
+        `Largura do pavilhão ${raw.venue.width}m ajustada para ${normalizedWidth}m (apenas medidas inteiras).`,
+      );
+    }
+    const normalizedHeight = normalizeDimension(raw.venue.height);
+    if (normalizedHeight !== raw.venue.height) {
+      warnings.push(
+        `Comprimento do pavilhão ${raw.venue.height}m ajustado para ${normalizedHeight}m (apenas medidas inteiras).`,
+      );
+    }
+    raw.venue.width = normalizedWidth;
+    raw.venue.height = normalizedHeight;
 
     if (raw.suggestedEvent) {
       const start = new Date(raw.suggestedEvent.startDate);
@@ -278,10 +316,15 @@ export class AiService {
 
     return {
       status: 'complete',
-      venue: { ...raw.venue, accent: colorPreset.accent, photo: colorPreset.photo },
+      venue: {
+        ...raw.venue,
+        accent: colorPreset.accent,
+        photo: colorPreset.photo,
+      },
       suggestedEvent: raw.suggestedEvent,
       confidence: raw.confidence,
       missing: raw.missing ?? [],
+      warnings,
     };
   }
 
@@ -292,7 +335,9 @@ export class AiService {
       );
     }
 
-    const venue = await this.prisma.venue.findUnique({ where: { id: dto.venueId } });
+    const venue = await this.prisma.venue.findUnique({
+      where: { id: dto.venueId },
+    });
     if (!venue) throw new NotFoundException(`Venue ${dto.venueId} not found`);
 
     if (dto.canvasWidth > venue.width || dto.canvasHeight > venue.height) {
@@ -309,14 +354,21 @@ export class AiService {
     });
 
     const messages: ChatMessage[] = [
-      { role: 'system', content: buildSystemPromptEvent(dto.canvasWidth, dto.canvasHeight, currentDate) },
+      {
+        role: 'system',
+        content: buildSystemPromptEvent(
+          dto.canvasWidth,
+          dto.canvasHeight,
+          currentDate,
+        ),
+      },
       ...(dto.history ?? []),
       { role: 'user', content: dto.prompt },
     ];
 
     const raw = (await this.llm.complete(
       messages,
-      PARSE_EVENT_SCHEMA as Record<string, unknown>,
+      PARSE_EVENT_SCHEMA,
     )) as RawParseEventResponse;
 
     if (raw.status === 'needs_info') {
@@ -348,7 +400,11 @@ export class AiService {
     if (!raw.layoutIntent || (raw.layoutIntent.groups?.length ?? 0) === 0) {
       return {
         status: 'complete',
-        event: { ...raw.event, canvasWidth: dto.canvasWidth, canvasHeight: dto.canvasHeight },
+        event: {
+          ...raw.event,
+          canvasWidth: dto.canvasWidth,
+          canvasHeight: dto.canvasHeight,
+        },
         allotments: [],
         summary: { total: 0, placed: 0, discarded: 0, groups: [] },
         warnings: [],
@@ -356,11 +412,41 @@ export class AiService {
       };
     }
 
-    const layoutResult = runLayout(raw.layoutIntent, dto.canvasWidth, dto.canvasHeight);
+    // O valor base do stand é obrigatório ao criar stands. Se a IA não o
+    // coletou, voltamos ao chat pedindo apenas o preço (ajustável depois).
+    const basePrice = raw.layoutIntent.basePrice;
+    if (
+      typeof basePrice !== 'number' ||
+      !Number.isFinite(basePrice) ||
+      basePrice <= 0
+    ) {
+      return {
+        status: 'needs_info',
+        questions: ['Qual o valor padrão de cada stand? (ex: 1000)'],
+        collected: {
+          name: raw.event.name,
+          type: raw.event.type,
+          startDate: raw.event.startDate,
+          endDate: raw.event.endDate,
+        },
+        assistantMessage:
+          'Quase lá! Para criar os stands preciso de um valor padrão por stand (ex: R$ 1.000). Você poderá ajustar individualmente depois.',
+      };
+    }
+
+    const layoutResult = runLayout(
+      raw.layoutIntent,
+      dto.canvasWidth,
+      dto.canvasHeight,
+    );
 
     return {
       status: 'complete',
-      event: { ...raw.event, canvasWidth: dto.canvasWidth, canvasHeight: dto.canvasHeight },
+      event: {
+        ...raw.event,
+        canvasWidth: dto.canvasWidth,
+        canvasHeight: dto.canvasHeight,
+      },
       allotments: layoutResult.allotments,
       summary: layoutResult.summary,
       warnings: layoutResult.warnings,
@@ -368,7 +454,9 @@ export class AiService {
     };
   }
 
-  private cleanCollectedVenue(collected: Partial<ParsedVenue> | null): Partial<ParsedVenue> {
+  private cleanCollectedVenue(
+    collected: Partial<ParsedVenue> | null,
+  ): Partial<ParsedVenue> {
     const cleaned = stripNulls<ParsedVenue>((collected ?? {}) as ParsedVenue);
     if (cleaned.accent) {
       const preset = resolveColorPreset(cleaned.accent);

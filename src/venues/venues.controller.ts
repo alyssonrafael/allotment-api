@@ -1,4 +1,14 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Put,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -75,7 +85,12 @@ export class VenuesController {
       example: {
         ...VENUE_EXAMPLE,
         events: [
-          { id: 'e1f2g3h4-...', name: 'Expo Tech 2025', startDate: '2025-09-11T00:00:00.000Z', endDate: '2025-09-14T00:00:00.000Z' },
+          {
+            id: 'e1f2g3h4-...',
+            name: 'Expo Tech 2025',
+            startDate: '2025-09-11T00:00:00.000Z',
+            endDate: '2025-09-14T00:00:00.000Z',
+          },
         ],
       },
     },
@@ -83,7 +98,11 @@ export class VenuesController {
   @ApiNotFoundResponse({
     description: 'Pavilhão não encontrado',
     schema: {
-      example: { statusCode: 404, message: 'Venue a1b2c3d4-... not found', detail: 'Venue a1b2c3d4-... not found' },
+      example: {
+        statusCode: 404,
+        message: 'Venue a1b2c3d4-... not found',
+        detail: 'Venue a1b2c3d4-... not found',
+      },
     },
   })
   findOne(@Param('id') id: string) {
@@ -94,13 +113,22 @@ export class VenuesController {
   @ApiOkResponse({
     description: 'Pavilhão atualizado',
     schema: {
-      example: { ...VENUE_EXAMPLE, name: 'Pavilhão Norte — Reformado', width: 120, updatedAt: '2025-01-10T11:00:00.000Z' },
+      example: {
+        ...VENUE_EXAMPLE,
+        name: 'Pavilhão Norte — Reformado',
+        width: 120,
+        updatedAt: '2025-01-10T11:00:00.000Z',
+      },
     },
   })
   @ApiNotFoundResponse({
     description: 'Pavilhão não encontrado',
     schema: {
-      example: { statusCode: 404, message: 'Venue a1b2c3d4-... not found', detail: 'Venue a1b2c3d4-... not found' },
+      example: {
+        statusCode: 404,
+        message: 'Venue a1b2c3d4-... not found',
+        detail: 'Venue a1b2c3d4-... not found',
+      },
     },
   })
   update(@Param('id') id: string, @Body() dto: UpdateVenueDto) {
@@ -122,7 +150,11 @@ export class VenuesController {
   @ApiNotFoundResponse({
     description: 'Pavilhão não encontrado',
     schema: {
-      example: { statusCode: 404, message: 'Venue a1b2c3d4-... not found', detail: 'Venue a1b2c3d4-... not found' },
+      example: {
+        statusCode: 404,
+        message: 'Venue a1b2c3d4-... not found',
+        detail: 'Venue a1b2c3d4-... not found',
+      },
     },
   })
   getRevenue(@Param('id') id: string) {
@@ -135,7 +167,11 @@ export class VenuesController {
   @ApiNotFoundResponse({
     description: 'Pavilhão não encontrado',
     schema: {
-      example: { statusCode: 404, message: 'Venue a1b2c3d4-... not found', detail: 'Venue a1b2c3d4-... not found' },
+      example: {
+        statusCode: 404,
+        message: 'Venue a1b2c3d4-... not found',
+        detail: 'Venue a1b2c3d4-... not found',
+      },
     },
   })
   @ApiConflictResponse({

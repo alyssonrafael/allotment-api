@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ActivityType, EventType } from '@prisma/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -33,11 +37,19 @@ export class EventsService {
       },
       include: { venue: { select: { id: true, name: true } } },
     });
-    await this.activitiesService.log(event.id, `Evento "${event.name}" foi criado`, ActivityType.CREATED);
+    await this.activitiesService.log(
+      event.id,
+      `Evento "${event.name}" foi criado`,
+      ActivityType.CREATED,
+    );
     return this.withStatus(event);
   }
 
-  async findAll(filters: { venueId?: string; type?: EventType; status?: EventStatus }) {
+  async findAll(filters: {
+    venueId?: string;
+    type?: EventType;
+    status?: EventStatus;
+  }) {
     const events = await this.prisma.event.findMany({
       where: {
         ...(filters.venueId ? { venueId: filters.venueId } : {}),
@@ -70,7 +82,9 @@ export class EventsService {
 
   async update(id: string, dto: UpdateEventDto) {
     const existing = await this.findOne(id);
-    const startDate = dto.startDate ? new Date(dto.startDate) : existing.startDate;
+    const startDate = dto.startDate
+      ? new Date(dto.startDate)
+      : existing.startDate;
     const endDate = dto.endDate ? new Date(dto.endDate) : existing.endDate;
     if (endDate < startDate) {
       throw new BadRequestException('endDate must be >= startDate');
@@ -83,13 +97,21 @@ export class EventsService {
         endDate: dto.endDate ? new Date(dto.endDate) : undefined,
       },
     });
-    await this.activitiesService.log(id, `Evento "${event.name}" foi atualizado`, ActivityType.UPDATED);
+    await this.activitiesService.log(
+      id,
+      `Evento "${event.name}" foi atualizado`,
+      ActivityType.UPDATED,
+    );
     return this.withStatus(event);
   }
 
   async remove(id: string) {
     const event = await this.findOne(id);
-    await this.activitiesService.log(id, `Evento "${event.name}" foi removido`, ActivityType.DELETED);
+    await this.activitiesService.log(
+      id,
+      `Evento "${event.name}" foi removido`,
+      ActivityType.DELETED,
+    );
     await this.prisma.event.delete({ where: { id } });
   }
 
@@ -103,7 +125,10 @@ export class EventsService {
     });
 
     const byStatus = Object.fromEntries(
-      groups.map((g) => [g.status, { sum: g._sum.price ?? 0, count: g._count.id }]),
+      groups.map((g) => [
+        g.status,
+        { sum: g._sum.price ?? 0, count: g._count.id },
+      ]),
     );
 
     const realized = byStatus['SOLD']?.sum ?? 0;
@@ -137,6 +162,9 @@ export class EventsService {
   }
 
   private withStatus<T extends { startDate: Date; endDate: Date }>(event: T) {
-    return { ...event, status: this.computeStatus(event.startDate, event.endDate) };
+    return {
+      ...event,
+      status: this.computeStatus(event.startDate, event.endDate),
+    };
   }
 }

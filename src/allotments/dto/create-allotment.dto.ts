@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AllotmentStatus } from '@prisma/client';
-import { IsEnum, IsNumber, IsOptional, IsPositive, IsString, Min } from 'class-validator';
+import {
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Min,
+} from 'class-validator';
 
 export class CreateAllotmentDto {
   @ApiProperty({ example: 'Stand Central' })
@@ -31,7 +38,10 @@ export class CreateAllotmentDto {
   @IsPositive()
   height!: number;
 
-  @ApiPropertyOptional({ enum: AllotmentStatus, default: AllotmentStatus.AVAILABLE })
+  @ApiPropertyOptional({
+    enum: AllotmentStatus,
+    default: AllotmentStatus.AVAILABLE,
+  })
   @IsOptional()
   @IsEnum(AllotmentStatus)
   status?: AllotmentStatus;

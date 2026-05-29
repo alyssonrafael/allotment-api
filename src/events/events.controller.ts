@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Put,
+  Query,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiCreatedResponse,
@@ -60,7 +71,11 @@ export class EventsController {
   @ApiNotFoundResponse({
     description: 'Venue não encontrado',
     schema: {
-      example: { statusCode: 404, message: 'Venue a1b2c3d4-... not found', detail: 'Venue a1b2c3d4-... not found' },
+      example: {
+        statusCode: 404,
+        message: 'Venue a1b2c3d4-... not found',
+        detail: 'Venue a1b2c3d4-... not found',
+      },
     },
   })
   create(@Body() dto: CreateEventDto) {
@@ -68,8 +83,17 @@ export class EventsController {
   }
 
   @Get()
-  @ApiQuery({ name: 'venueId', required: false, description: 'Filtra por pavilhão' })
-  @ApiQuery({ name: 'type', required: false, enum: EventType, description: 'Filtra por tipo de evento' })
+  @ApiQuery({
+    name: 'venueId',
+    required: false,
+    description: 'Filtra por pavilhão',
+  })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: EventType,
+    description: 'Filtra por tipo de evento',
+  })
   @ApiQuery({
     name: 'status',
     required: false,
@@ -77,7 +101,8 @@ export class EventsController {
     description: 'Filtra por status computado (derivado das datas)',
   })
   @ApiOkResponse({
-    description: 'Lista de eventos com venue, contagem de allotments e status computado',
+    description:
+      'Lista de eventos com venue, contagem de allotments e status computado',
     schema: {
       example: [
         {
@@ -102,7 +127,12 @@ export class EventsController {
     schema: {
       example: {
         ...EVENT_EXAMPLE,
-        venue: { id: 'a1b2c3d4-...', name: 'Pavilhão Norte', width: 100, height: 60 },
+        venue: {
+          id: 'a1b2c3d4-...',
+          name: 'Pavilhão Norte',
+          width: 100,
+          height: 60,
+        },
         allotments: [
           {
             id: 'b2c3d4e5-...',
@@ -152,13 +182,21 @@ export class EventsController {
   @ApiBadRequestResponse({
     description: 'Dados inválidos ou endDate anterior a startDate',
     schema: {
-      example: { statusCode: 400, message: 'endDate must be >= startDate', detail: 'endDate must be >= startDate' },
+      example: {
+        statusCode: 400,
+        message: 'endDate must be >= startDate',
+        detail: 'endDate must be >= startDate',
+      },
     },
   })
   @ApiNotFoundResponse({
     description: 'Evento não encontrado',
     schema: {
-      example: { statusCode: 404, message: 'Event e1f2g3h4-... not found', detail: 'Event e1f2g3h4-... not found' },
+      example: {
+        statusCode: 404,
+        message: 'Event e1f2g3h4-... not found',
+        detail: 'Event e1f2g3h4-... not found',
+      },
     },
   })
   update(@Param('id') id: string, @Body() dto: UpdateEventDto) {
@@ -167,11 +205,17 @@ export class EventsController {
 
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiNoContentResponse({ description: 'Evento removido (allotments removidos em cascata)' })
+  @ApiNoContentResponse({
+    description: 'Evento removido (allotments removidos em cascata)',
+  })
   @ApiNotFoundResponse({
     description: 'Evento não encontrado',
     schema: {
-      example: { statusCode: 404, message: 'Event e1f2g3h4-... not found', detail: 'Event e1f2g3h4-... not found' },
+      example: {
+        statusCode: 404,
+        message: 'Event e1f2g3h4-... not found',
+        detail: 'Event e1f2g3h4-... not found',
+      },
     },
   })
   remove(@Param('id') id: string) {
@@ -193,7 +237,11 @@ export class EventsController {
   @ApiNotFoundResponse({
     description: 'Evento não encontrado',
     schema: {
-      example: { statusCode: 404, message: 'Event e1f2g3h4-... not found', detail: 'Event e1f2g3h4-... not found' },
+      example: {
+        statusCode: 404,
+        message: 'Event e1f2g3h4-... not found',
+        detail: 'Event e1f2g3h4-... not found',
+      },
     },
   })
   getRevenue(@Param('id') id: string) {
@@ -217,7 +265,11 @@ export class EventsController {
   @ApiNotFoundResponse({
     description: 'Evento não encontrado',
     schema: {
-      example: { statusCode: 404, message: 'Event e1f2g3h4-... not found', detail: 'Event e1f2g3h4-... not found' },
+      example: {
+        statusCode: 404,
+        message: 'Event e1f2g3h4-... not found',
+        detail: 'Event e1f2g3h4-... not found',
+      },
     },
   })
   getActivities(@Param('id') id: string) {

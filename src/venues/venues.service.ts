@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVenueDto } from './dto/create-venue.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
@@ -21,7 +25,11 @@ export class VenuesService {
   async findOne(id: string) {
     const venue = await this.prisma.venue.findUnique({
       where: { id },
-      include: { events: { select: { id: true, name: true, startDate: true, endDate: true } } },
+      include: {
+        events: {
+          select: { id: true, name: true, startDate: true, endDate: true },
+        },
+      },
     });
     if (!venue) throw new NotFoundException(`Venue ${id} not found`);
     return venue;
@@ -42,7 +50,10 @@ export class VenuesService {
     });
 
     const byStatus = Object.fromEntries(
-      groups.map((g) => [g.status, { sum: g._sum.price ?? 0, count: g._count.id }]),
+      groups.map((g) => [
+        g.status,
+        { sum: g._sum.price ?? 0, count: g._count.id },
+      ]),
     );
 
     const realized = byStatus['SOLD']?.sum ?? 0;

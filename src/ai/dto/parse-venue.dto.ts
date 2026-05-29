@@ -1,12 +1,20 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsArray, IsOptional, IsString, Length, ValidateNested } from 'class-validator';
+import {
+  IsArray,
+  IsOptional,
+  IsString,
+  Length,
+  ValidateNested,
+} from 'class-validator';
 import { MessageDto } from './message.dto';
 
 export class ParseVenueDto {
   @ApiProperty({
-    example: 'Pavilhão em São Paulo, 50x35 metros, tema azul, para feiras de tecnologia',
-    description: 'Mensagem atual do usuário em linguagem natural (10–1000 caracteres)',
+    example:
+      'Pavilhão em São Paulo, 50x35 metros, tema azul, para feiras de tecnologia',
+    description:
+      'Mensagem atual do usuário em linguagem natural (10–1000 caracteres)',
   })
   @IsString()
   @Length(1, 1000)
@@ -14,7 +22,8 @@ export class ParseVenueDto {
 
   @ApiPropertyOptional({
     type: [MessageDto],
-    description: 'Histórico da conversa (turnos anteriores). Vazio ou ausente na primeira mensagem.',
+    description:
+      'Histórico da conversa (turnos anteriores). Vazio ou ausente na primeira mensagem.',
   })
   @IsOptional()
   @IsArray()
@@ -85,10 +94,20 @@ export const PARSE_VENUE_SCHEMA = {
         {
           type: 'object',
           additionalProperties: false,
-          required: ['name', 'type', 'startDate', 'endDate', 'canvasWidth', 'canvasHeight'],
+          required: [
+            'name',
+            'type',
+            'startDate',
+            'endDate',
+            'canvasWidth',
+            'canvasHeight',
+          ],
           properties: {
             name: { type: 'string' },
-            type: { type: 'string', enum: ['FEIRA', 'CONGRESSO', 'EXPO', 'CORPORATE'] },
+            type: {
+              type: 'string',
+              enum: ['FEIRA', 'CONGRESSO', 'EXPO', 'CORPORATE'],
+            },
             startDate: { type: 'string' },
             endDate: { type: 'string' },
             canvasWidth: { type: 'number' },
@@ -163,6 +182,7 @@ export interface ParseVenueComplete {
   suggestedEvent: SuggestedEvent | null;
   confidence: number;
   missing: string[];
+  warnings: string[];
 }
 
 export interface ParseVenueNeedsInfo {

@@ -1,6 +1,15 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { EventType } from '@prisma/client';
-import { IsDateString, IsEnum, IsNumber, IsOptional, IsString, IsUUID, Min, MinLength } from 'class-validator';
+import {
+  IsDateString,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+  IsUUID,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CreateEventDto {
   @ApiProperty({ example: 'Expo Tech 2025' })
@@ -24,13 +33,19 @@ export class CreateEventDto {
   @IsUUID()
   venueId!: string;
 
-  @ApiPropertyOptional({ example: 80, description: 'Sobrescreve a largura do venue (área parcial)' })
+  @ApiPropertyOptional({
+    example: 80,
+    description: 'Sobrescreve a largura do venue (área parcial)',
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)
   canvasWidth?: number;
 
-  @ApiPropertyOptional({ example: 50, description: 'Sobrescreve a altura do venue (área parcial)' })
+  @ApiPropertyOptional({
+    example: 50,
+    description: 'Sobrescreve a altura do venue (área parcial)',
+  })
   @IsOptional()
   @IsNumber()
   @Min(1)

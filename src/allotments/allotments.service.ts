@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { ActivityType, Allotment } from '@prisma/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { EventsService } from '../events/events.service';
@@ -30,21 +34,34 @@ export class AllotmentsService {
       where: { eventId_code: { eventId, code: dto.code } },
     });
     if (existing) {
-      throw new ConflictException(`Code "${dto.code}" already exists in this event`);
+      throw new ConflictException(
+        `Code "${dto.code}" already exists in this event`,
+      );
     }
 
     this.validateBounds(dto, event);
 
-    const allotments = await this.prisma.allotment.findMany({ where: { eventId } });
+    const allotments = await this.prisma.allotment.findMany({
+      where: { eventId },
+    });
     this.validateCollision(dto, allotments);
 
-    const allotment = await this.prisma.allotment.create({ data: { ...dto, eventId } });
-    await this.activitiesService.log(eventId, `Lote "${dto.code}" foi criado`, ActivityType.CREATED);
+    const allotment = await this.prisma.allotment.create({
+      data: { ...dto, eventId },
+    });
+    await this.activitiesService.log(
+      eventId,
+      `Lote "${dto.code}" foi criado`,
+      ActivityType.CREATED,
+    );
     return allotment;
   }
 
   findAllByEvent(eventId: string) {
-    return this.prisma.allotment.findMany({ where: { eventId }, orderBy: { createdAt: 'asc' } });
+    return this.prisma.allotment.findMany({
+      where: { eventId },
+      orderBy: { createdAt: 'asc' },
+    });
   }
 
   async findOne(id: string) {
@@ -71,37 +88,67 @@ export class AllotmentsService {
     });
     this.validateCollision(candidate, siblings);
 
-    const updated = await this.prisma.allotment.update({ where: { id }, data: dto });
-    await this.activitiesService.log(allotment.eventId, `Lote "${allotment.code}" foi atualizado`, ActivityType.UPDATED);
+    const updated = await this.prisma.allotment.update({
+      where: { id },
+      data: dto,
+    });
+    await this.activitiesService.log(
+      allotment.eventId,
+      `Lote "${allotment.code}" foi atualizado`,
+      ActivityType.UPDATED,
+    );
     return updated;
   }
 
   async updatePosition(id: string, dto: UpdateAllotmentPositionDto) {
     const allotment = await this.findOne(id);
     const event = await this.eventsService.findOne(allotment.eventId);
-    const candidate = { x: dto.x, y: dto.y, width: allotment.width, height: allotment.height };
+    const candidate = {
+      x: dto.x,
+      y: dto.y,
+      width: allotment.width,
+      height: allotment.height,
+    };
     this.validateBounds(candidate, event);
     const siblings = await this.prisma.allotment.findMany({
       where: { eventId: allotment.eventId, id: { not: id } },
     });
     this.validateCollision(candidate, siblings);
-    const updated = await this.prisma.allotment.update({ where: { id }, data: dto });
-    await this.activitiesService.log(allotment.eventId, `Lote "${allotment.code}" teve posição ajustada`, ActivityType.UPDATED);
+    const updated = await this.prisma.allotment.update({
+      where: { id },
+      data: dto,
+    });
+    await this.activitiesService.log(
+      allotment.eventId,
+      `Lote "${allotment.code}" teve posição ajustada`,
+      ActivityType.UPDATED,
+    );
     return updated;
   }
 
   async updateStatus(id: string, dto: UpdateAllotmentStatusDto) {
     const allotment = await this.findOne(id);
-    const updated = await this.prisma.allotment.update({ where: { id }, data: dto });
+    const updated = await this.prisma.allotment.update({
+      where: { id },
+      data: dto,
+    });
     const activityType = ActivityType[dto.status as keyof typeof ActivityType];
     const statusLabel = STATUS_LABELS[dto.status] || dto.status;
-    await this.activitiesService.log(allotment.eventId, `Lote "${allotment.code}" passou para ${statusLabel}`, activityType);
+    await this.activitiesService.log(
+      allotment.eventId,
+      `Lote "${allotment.code}" passou para ${statusLabel}`,
+      activityType,
+    );
     return updated;
   }
 
   async remove(id: string) {
     const allotment = await this.findOne(id);
-    await this.activitiesService.log(allotment.eventId, `Lote "${allotment.code}" foi removido`, ActivityType.DELETED);
+    await this.activitiesService.log(
+      allotment.eventId,
+      `Lote "${allotment.code}" foi removido`,
+      ActivityType.DELETED,
+    );
     await this.prisma.allotment.delete({ where: { id } });
   }
 
@@ -130,6 +177,7 @@ export class AllotmentsService {
         a.y < b.y + b.height &&
         a.y + a.height > b.y,
     );
-    if (collides) throw new ConflictException('Allotment collides with an existing stand');
+    if (collides)
+      throw new ConflictException('Allotment collides with an existing stand');
   }
 }

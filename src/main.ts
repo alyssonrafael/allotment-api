@@ -7,7 +7,9 @@ import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  const allowedOrigins = (process.env.CORS_ORIGINS ?? 'http://localhost:3000').split(',');
+  const allowedOrigins = (
+    process.env.CORS_ORIGINS ?? 'http://localhost:3000'
+  ).split(',');
   app.enableCors({ origin: allowedOrigins, credentials: true });
 
   const prefix = process.env.API_PREFIX ?? 'api/v1';
@@ -15,10 +17,13 @@ async function bootstrap() {
 
   // alias /health para UptimeRobot e Docker healthcheck
   const http = app.getHttpAdapter().getInstance();
-  http.get('/health', (_req: unknown, res: { json: (body: unknown) => void }) => res.json({ status: 'ok' }));
+  http.get('/health', (_req: unknown, res: { json: (body: unknown) => void }) =>
+    res.json({ status: 'ok' }),
+  );
 
   if (process.env.SWAGGER_ENABLED === 'true') {
-    const serverUrl = process.env.API_URL ?? `http://localhost:${process.env.PORT ?? 3333}`;
+    const serverUrl =
+      process.env.API_URL ?? `http://localhost:${process.env.PORT ?? 3333}`;
     const config = new DocumentBuilder()
       .setTitle('Allotment API')
       .setDescription('API para gestão de eventos e allotments')

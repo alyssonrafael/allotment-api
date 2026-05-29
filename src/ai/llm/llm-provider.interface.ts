@@ -6,5 +6,8 @@ export interface ChatMessage {
 }
 
 export interface LlmProvider {
-  complete(messages: ChatMessage[], schema: Record<string, unknown>): Promise<unknown>;
+  complete(
+    messages: ChatMessage[],
+    schema: Record<string, unknown>,
+  ): Promise<unknown>;
 }

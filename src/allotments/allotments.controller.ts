@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Put } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Put,
+} from '@nestjs/common';
 import {
   ApiBadRequestResponse,
   ApiConflictResponse,
@@ -45,7 +56,10 @@ export class AllotmentsController {
       example: {
         statusCode: 400,
         message: 'Validation failed',
-        detail: ['width must be a positive number', 'x must not be less than 0'],
+        detail: [
+          'width must be a positive number',
+          'x must not be less than 0',
+        ],
       },
     },
   })
@@ -209,7 +223,10 @@ export class AllotmentsController {
       },
     },
   })
-  updatePosition(@Param('id') id: string, @Body() dto: UpdateAllotmentPositionDto) {
+  updatePosition(
+    @Param('id') id: string,
+    @Body() dto: UpdateAllotmentPositionDto,
+  ) {
     return this.allotmentsService.updatePosition(id, dto);
   }
 

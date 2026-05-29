@@ -6,9 +6,6 @@ import { OpenAiProvider } from './llm/openai.provider';
 
 @Module({
   controllers: [AiController],
-  providers: [
-    AiService,
-    { provide: LLM_PROVIDER, useClass: OpenAiProvider },
-  ],
+  providers: [AiService, { provide: LLM_PROVIDER, useClass: OpenAiProvider }],
 })
 export class AiModule {}

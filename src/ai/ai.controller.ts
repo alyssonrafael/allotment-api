@@ -38,18 +38,25 @@ export class AiController {
               neighborhood: null,
               zipCode: null,
               accent: '#2563eb',
-              photo: 'linear-gradient(135deg, #2563eb 0%, #6366f1 60%, #8b5cf6 100%)',
+              photo:
+                'linear-gradient(135deg, #2563eb 0%, #6366f1 60%, #8b5cf6 100%)',
             },
             suggestedEvent: null,
             confidence: 0.85,
             missing: ['endereço', 'CEP'],
+            warnings: [
+              'Largura do pavilhão 50.5m ajustada para 51m (apenas medidas inteiras).',
+            ],
           },
         },
         {
           title: 'needs_info',
           example: {
             status: 'needs_info',
-            questions: ['Qual é o nome do pavilhão?', 'Em qual cidade e estado ficará?'],
+            questions: [
+              'Qual é o nome do pavilhão?',
+              'Em qual cidade e estado ficará?',
+            ],
             collected: { width: 50, height: 30, accent: '#2563eb' },
             assistantMessage:
               'Ótimo! Pavilhão de 50×30m com tema azul. Falta só: qual o nome e a cidade/estado?',
@@ -58,9 +65,17 @@ export class AiController {
       ],
     },
   })
-  @ApiBadRequestResponse({ description: 'Prompt inválido (muito curto, muito longo ou malformado)' })
-  @ApiResponse({ status: 422, description: 'A IA não conseguiu extrair os dados mínimos do prompt' })
-  @ApiResponse({ status: 503, description: 'Serviço de IA temporariamente indisponível' })
+  @ApiBadRequestResponse({
+    description: 'Prompt inválido (muito curto, muito longo ou malformado)',
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'A IA não conseguiu extrair os dados mínimos do prompt',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Serviço de IA temporariamente indisponível',
+  })
   parseVenue(@Body() dto: ParseVenueDto) {
     return this.aiService.parseVenue(dto);
   }
@@ -86,10 +101,26 @@ export class AiController {
               canvasHeight: 35,
             },
             allotments: [
-              { code: 'A-01', name: 'Stand A-01', x: 0, y: 0, width: 2, height: 2, status: 'AVAILABLE', price: 4000 },
+              {
+                code: 'A-01',
+                name: 'Stand A-01',
+                x: 0,
+                y: 0,
+                width: 2,
+                height: 2,
+                status: 'AVAILABLE',
+                price: 4000,
+              },
             ],
-            summary: { total: 30, placed: 28, discarded: 2, groups: [{ width: 2, height: 2, count: 10, placed: 10 }] },
-            warnings: ['Dimensão 5.1m ajustada para 5m (o sistema aceita apenas medidas inteiras em metros).'],
+            summary: {
+              total: 30,
+              placed: 28,
+              discarded: 2,
+              groups: [{ width: 2, height: 2, count: 10, placed: 10 }],
+            },
+            warnings: [
+              'Dimensão 5.1m ajustada para 5m (o sistema aceita apenas medidas inteiras em metros).',
+            ],
             missing: [],
           },
         },
@@ -99,16 +130,25 @@ export class AiController {
             status: 'needs_info',
             questions: ['Qual o nome do evento e as datas?'],
             collected: { type: 'EXPO' },
-            assistantMessage: 'Entendi: 30 stands de 3x3. Qual o nome do evento e as datas de início e término?',
+            assistantMessage:
+              'Entendi: 30 stands de 3x3. Qual o nome do evento e as datas de início e término?',
           },
         },
       ],
     },
   })
-  @ApiBadRequestResponse({ description: 'Parâmetros inválidos ou canvas maior que o venue' })
+  @ApiBadRequestResponse({
+    description: 'Parâmetros inválidos ou canvas maior que o venue',
+  })
   @ApiNotFoundResponse({ description: 'Venue não encontrado' })
-  @ApiResponse({ status: 422, description: 'A IA não conseguiu extrair os dados mínimos do prompt' })
-  @ApiResponse({ status: 503, description: 'Serviço de IA temporariamente indisponível' })
+  @ApiResponse({
+    status: 422,
+    description: 'A IA não conseguiu extrair os dados mínimos do prompt',
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Serviço de IA temporariamente indisponível',
+  })
   parseEvent(@Body() dto: ParseEventDto) {
     return this.aiService.parseEvent(dto);
   }

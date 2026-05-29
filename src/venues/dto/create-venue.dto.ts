@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsNumber, IsOptional, IsString, Length, Min, MinLength } from 'class-validator';
+import {
+  IsNumber,
+  IsOptional,
+  IsString,
+  Length,
+  Min,
+  MinLength,
+} from 'class-validator';
 
 export class CreateVenueDto {
   @ApiProperty({ example: 'Pavilhão Norte' })
@@ -29,7 +36,9 @@ export class CreateVenueDto {
 
   @ApiProperty({ example: 'SP', description: 'Sigla da UF — 2 caracteres' })
   @IsString()
-  @Length(2, 2, { message: 'state deve ser a sigla da UF com 2 caracteres (ex: SP)' })
+  @Length(2, 2, {
+    message: 'state deve ser a sigla da UF com 2 caracteres (ex: SP)',
+  })
   state!: string;
 
   @ApiPropertyOptional({ example: 'Av. Olavo Fontoura, 1209' })
@@ -47,7 +56,10 @@ export class CreateVenueDto {
   @IsString()
   zipCode?: string;
 
-  @ApiProperty({ example: 'var(--primary)', description: 'CSS color token para detalhes visuais' })
+  @ApiProperty({
+    example: 'var(--primary)',
+    description: 'CSS color token para detalhes visuais',
+  })
   @IsString()
   accent!: string;
 

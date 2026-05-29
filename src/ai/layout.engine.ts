@@ -1,3 +1,10 @@
+import {
+  isValidDimension,
+  normalizeCount,
+  normalizeDimension,
+  normalizeSpacing,
+} from './dimension.util';
+
 export interface StandGroup {
   width: number;
   height: number;
@@ -6,7 +13,12 @@ export interface StandGroup {
   pricePerSqm?: number | null;
 }
 
-export type StartCorner = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center';
+export type StartCorner =
+  | 'top-left'
+  | 'top-right'
+  | 'bottom-left'
+  | 'bottom-right'
+  | 'center';
 
 export interface LayoutIntent {
   groups: StandGroup[];
@@ -35,7 +47,12 @@ export interface LayoutResult {
     total: number;
     placed: number;
     discarded: number;
-    groups: Array<{ width: number; height: number; count: number; placed: number }>;
+    groups: Array<{
+      width: number;
+      height: number;
+      count: number;
+      placed: number;
+    }>;
   };
   warnings: string[];
 }
@@ -46,19 +63,8 @@ function generateCode(index: number): string {
   return `${letter}-${String(num).padStart(2, '0')}`;
 }
 
-// Dimensões válidas: números inteiros em metros e mínimo 1.
-function isValidDimension(value: number | undefined | null): boolean {
-  if (typeof value !== 'number') return false;
-  return value >= 1 && Number.isInteger(value);
-}
-
-function normalizeDimension(value: number | undefined | null): number {
-  if (typeof value !== 'number' || isNaN(value)) return 1;
-  return Math.max(1, Math.round(value));
-}
-
-// Arredonda dimensões inválidas para o inteiro mais próximo (mínimo 1m),
-// acrescentando um aviso por grupo ajustado.
+// Arredonda dimensões e quantidades inválidas para o inteiro mais próximo
+// (mínimo 1), acrescentando um aviso por grupo ajustado.
 function normalizeGroups(
   groups: StandGroup[],
   warnings: string[],
@@ -66,6 +72,7 @@ function normalizeGroups(
   return groups.map((group) => {
     let width = group.width;
     let height = group.height;
+    let count = group.count;
     const parts: string[] = [];
 
     // Se não for válido (ex: 2.5), forçamos o arredondamento
@@ -74,23 +81,48 @@ function normalizeGroups(
       parts.push(`largura ${width}m ajustada para ${adjusted}m`);
       width = adjusted;
     }
-    
+
     if (!isValidDimension(height)) {
       const adjusted = normalizeDimension(height);
       parts.push(`profundidade ${height}m ajustada para ${adjusted}m`);
       height = adjusted;
     }
 
-    if (parts.length > 0) {
-      warnings.push(`Medida fracionada corrigida: ${parts.join(' e ')}. O sistema usa apenas metros inteiros absolutos.`);
+    if (!isValidDimension(count)) {
+      const adjusted = normalizeCount(count);
+      parts.push(`quantidade ${count} ajustada para ${adjusted} stand(s)`);
+      count = adjusted;
     }
 
-    return { ...group, width, height };
+    if (parts.length > 0) {
+      warnings.push(
+        `Medida fracionada corrigida: ${parts.join(' e ')}. O sistema usa apenas metros inteiros absolutos.`,
+      );
+    }
+
+    return { ...group, width, height, count };
   });
 }
 
-export function runLayout(intent: LayoutIntent, canvasWidth: number, canvasHeight: number): LayoutResult {
-  const { corridorH, corridorV, mainCorridorH, mainCorridorV, basePrice } = intent;
+export function runLayout(
+  intent: LayoutIntent,
+  canvasWidth: number,
+  canvasHeight: number,
+): LayoutResult {
+  const { basePrice } = intent;
+
+  // Corredores também são inteiros (>= 0) para manter todas as coordenadas
+  // inteiras, já que os stands são inteiros. Decimais são arredondados.
+  const corridorH = normalizeSpacing(intent.corridorH);
+  const corridorV = normalizeSpacing(intent.corridorV);
+  const mainCorridorH =
+    intent.mainCorridorH != null
+      ? normalizeSpacing(intent.mainCorridorH)
+      : null;
+  const mainCorridorV =
+    intent.mainCorridorV != null
+      ? normalizeSpacing(intent.mainCorridorV)
+      : null;
 
   const allotments: PlacedStand[] = [];
   const warnings: string[] = [];
@@ -98,8 +130,9 @@ export function runLayout(intent: LayoutIntent, canvasWidth: number, canvasHeigh
 
   const groups = normalizeGroups(intent.groups, warnings);
 
-  const minArea =
-    groups.length > 0 ? Math.min(...groups.map((g) => g.width * g.height)) : 1;
+  // Preço fixo: todo stand recebe o valor padrão informado pelo usuário
+  // (obrigatório; validado no serviço antes de chegar aqui). Ajustável depois.
+  const price = basePrice ?? 0;
 
   let standIndex = 0;
   let cursorY = 0;
@@ -152,9 +185,6 @@ export function runLayout(intent: LayoutIntent, canvasWidth: number, canvasHeigh
       }
 
       const code = generateCode(standIndex++);
-      const area = width * height;
-      const price =
-        basePrice != null ? Math.round(basePrice * (area / minArea)) : area * 1000;
 
       allotments.push({
         code,
@@ -205,7 +235,12 @@ export function runLayout(intent: LayoutIntent, canvasWidth: number, canvasHeigh
   const total = groups.reduce((sum, g) => sum + g.count, 0);
 
   return {
-    allotments: applyStartCorner(allotments, canvasWidth, canvasHeight, intent.startCorner),
+    allotments: applyStartCorner(
+      allotments,
+      canvasWidth,
+      canvasHeight,
+      intent.startCorner,
+    ),
     summary: {
       total,
       placed,
@@ -222,14 +257,19 @@ function applyStartCorner(
   canvasHeight: number,
   corner: StartCorner | null | undefined,
 ): PlacedStand[] {
-  if (!corner || corner === 'top-left' || allotments.length === 0) return allotments;
+  if (!corner || corner === 'top-left' || allotments.length === 0)
+    return allotments;
 
   if (corner === 'center') {
     const maxX = Math.max(...allotments.map((a) => a.x + a.width));
     const maxY = Math.max(...allotments.map((a) => a.y + a.height));
     const offsetX = Math.max(0, (canvasWidth - maxX) / 2);
     const offsetY = Math.max(0, (canvasHeight - maxY) / 2);
-    return allotments.map((a) => ({ ...a, x: a.x + offsetX, y: a.y + offsetY }));
+    return allotments.map((a) => ({
+      ...a,
+      x: a.x + offsetX,
+      y: a.y + offsetY,
+    }));
   }
 
   const flipX = corner === 'top-right' || corner === 'bottom-right';
