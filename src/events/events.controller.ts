@@ -6,12 +6,14 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Put,
   Query,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
+  ApiConflictResponse,
   ApiCreatedResponse,
   ApiNoContentResponse,
   ApiNotFoundResponse,
@@ -20,7 +22,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { EventType } from '@prisma/client';
+import { CreateEventFloorDto } from './dto/create-event-floor.dto';
 import { CreateEventDto } from './dto/create-event.dto';
+import { UpdateEventFloorDto } from './dto/update-event-floor.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { EventsService } from './events.service';
 
@@ -223,8 +227,13 @@ export class EventsController {
   }
 
   @Get(':id/revenue')
+  @ApiQuery({
+    name: 'eventFloorId',
+    required: false,
+    description: 'Filtra a receita por um andar específico do evento',
+  })
   @ApiOkResponse({
-    description: 'Receita do evento separada por status dos lotes',
+    description: 'Receita do evento separada por status dos lotes, opcionalmente filtrada por andar',
     schema: {
       example: {
         realized: 15000,
@@ -244,8 +253,20 @@ export class EventsController {
       },
     },
   })
-  getRevenue(@Param('id') id: string) {
-    return this.eventsService.getRevenue(id);
+  getRevenue(
+    @Param('id') id: string,
+    @Query('eventFloorId') eventFloorId?: string,
+  ) {
+    return this.eventsService.getRevenue(id, eventFloorId);
+  }
+
+  @Get(':id/dashboard')
+  @ApiOkResponse({
+    description: 'Dashboard geral do evento, agregando todos os andares',
+  })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado' })
+  getDashboard(@Param('id') id: string) {
+    return this.eventsService.getDashboard(id);
   }
 
   @Get(':id/activities')
@@ -274,5 +295,53 @@ export class EventsController {
   })
   getActivities(@Param('id') id: string) {
     return this.eventsService.getActivities(id);
+  }
+
+  @Get(':id/floors')
+  @ApiOkResponse({ description: 'Andares usados pelo evento' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado' })
+  findFloors(@Param('id') id: string) {
+    return this.eventsService.findFloors(id);
+  }
+
+  @Post(':id/floors')
+  @ApiCreatedResponse({ description: 'Andar adicionado ao evento' })
+  @ApiBadRequestResponse({ description: 'Andar não pertence ao pavilhão do evento' })
+  @ApiNotFoundResponse({ description: 'Evento não encontrado' })
+  @ApiConflictResponse({ description: 'Evento já usa este level de andar' })
+  addFloor(@Param('id') id: string, @Body() dto: CreateEventFloorDto) {
+    return this.eventsService.addFloor(id, dto);
+  }
+}
+
+@ApiTags('Event Floors')
+@Controller('event-floors')
+export class EventFloorsController {
+  constructor(private readonly eventsService: EventsService) {}
+
+  @Patch(':id')
+  @ApiOkResponse({ description: 'Andar do evento atualizado' })
+  @ApiNotFoundResponse({ description: 'Andar do evento não encontrado' })
+  @ApiConflictResponse({ description: 'Dimensão conflitante com stands existentes' })
+  update(@Param('id') id: string, @Body() dto: UpdateEventFloorDto) {
+    return this.eventsService.updateFloor(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Andar do evento removido' })
+  @ApiNotFoundResponse({ description: 'Andar do evento não encontrado' })
+  @ApiConflictResponse({ description: 'Andar possui stands ou é o último do evento' })
+  remove(@Param('id') id: string) {
+    return this.eventsService.removeFloor(id);
+  }
+
+  @Get(':id/dashboard')
+  @ApiOkResponse({
+    description: 'Dashboard de um andar específico do evento',
+  })
+  @ApiNotFoundResponse({ description: 'Andar do evento não encontrado' })
+  getDashboard(@Param('id') id: string) {
+    return this.eventsService.getFloorDashboard(id);
   }
 }

@@ -19,6 +19,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { CreateVenueDto } from './dto/create-venue.dto';
+import { CreateVenueFloorDto } from './dto/create-venue-floor.dto';
+import { UpdateVenueFloorDto } from './dto/update-venue-floor.dto';
 import { UpdateVenueDto } from './dto/update-venue.dto';
 import { VenuesService } from './venues.service';
 
@@ -135,6 +137,34 @@ export class VenuesController {
     return this.venuesService.update(id, dto);
   }
 
+  @Post(':venueId/floors')
+  @ApiCreatedResponse({ description: 'Andar do pavilhão criado' })
+  @ApiNotFoundResponse({ description: 'Pavilhão não encontrado' })
+  @ApiConflictResponse({ description: 'Já existe andar com este level' })
+  createFloor(
+    @Param('venueId') venueId: string,
+    @Body() dto: CreateVenueFloorDto,
+  ) {
+    return this.venuesService.createFloor(venueId, dto);
+  }
+
+  @Put('floors/:id')
+  @ApiOkResponse({ description: 'Andar do pavilhão atualizado' })
+  @ApiNotFoundResponse({ description: 'Andar não encontrado' })
+  @ApiConflictResponse({ description: 'Já existe andar com este level' })
+  updateFloor(@Param('id') id: string, @Body() dto: UpdateVenueFloorDto) {
+    return this.venuesService.updateFloor(id, dto);
+  }
+
+  @Delete('floors/:id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Andar do pavilhão removido' })
+  @ApiNotFoundResponse({ description: 'Andar não encontrado' })
+  @ApiConflictResponse({ description: 'Não é possível remover o último andar' })
+  removeFloor(@Param('id') id: string) {
+    return this.venuesService.removeFloor(id);
+  }
+
   @Get(':id/revenue')
   @ApiOkResponse({
     description: 'Receita do pavilhão agregada de todos os seus eventos',
@@ -186,5 +216,28 @@ export class VenuesController {
   })
   remove(@Param('id') id: string) {
     return this.venuesService.remove(id);
+  }
+}
+
+@ApiTags('Venue Floors')
+@Controller('venue-floors')
+export class VenueFloorsController {
+  constructor(private readonly venuesService: VenuesService) {}
+
+  @Put(':id')
+  @ApiOkResponse({ description: 'Andar do pavilhão atualizado' })
+  @ApiNotFoundResponse({ description: 'Andar não encontrado' })
+  @ApiConflictResponse({ description: 'Já existe andar com este level' })
+  update(@Param('id') id: string, @Body() dto: UpdateVenueFloorDto) {
+    return this.venuesService.updateFloor(id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiNoContentResponse({ description: 'Andar do pavilhão removido' })
+  @ApiNotFoundResponse({ description: 'Andar não encontrado' })
+  @ApiConflictResponse({ description: 'Não é possível remover o último andar' })
+  remove(@Param('id') id: string) {
+    return this.venuesService.removeFloor(id);
   }
 }

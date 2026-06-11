@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  IsUUID,
   Min,
 } from 'class-validator';
 
@@ -46,8 +47,21 @@ export class CreateAllotmentDto {
   @IsEnum(AllotmentStatus)
   status?: AllotmentStatus;
 
-  @ApiProperty({ example: 1500.0 })
+  @ApiPropertyOptional({
+    example: 1500.0,
+    description:
+      'Opcional. Se ausente, usa Event.defaultAllotmentPrice; se não houver padrão, usa 0.',
+  })
+  @IsOptional()
   @IsNumber()
   @Min(0)
-  price!: number;
+  price?: number;
+
+  @ApiPropertyOptional({
+    example: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+    description: 'Obrigatório quando o evento tiver mais de um andar.',
+  })
+  @IsOptional()
+  @IsUUID()
+  eventFloorId?: string;
 }

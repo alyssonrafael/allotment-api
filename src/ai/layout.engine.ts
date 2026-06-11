@@ -11,6 +11,7 @@ export interface StandGroup {
   count: number;
   label?: string | null;
   pricePerSqm?: number | null;
+  floorLevel?: number | null;
 }
 
 export type StartCorner =
@@ -39,6 +40,8 @@ export interface PlacedStand {
   height: number;
   status: 'AVAILABLE';
   price: number;
+  venueFloorId?: string;
+  floorLevel?: number;
 }
 
 export interface LayoutResult {
@@ -52,6 +55,7 @@ export interface LayoutResult {
       height: number;
       count: number;
       placed: number;
+      floorLevel?: number | null;
     }>;
   };
   warnings: string[];
@@ -146,7 +150,13 @@ export function runLayout(
       warnings.push(
         `${count} stand(s) ${width}x${height} descartado(s) — maior que o canvas (${canvasWidth}x${canvasHeight})`,
       );
-      summaryGroups.push({ width, height, count, placed: 0 });
+      summaryGroups.push({
+        width,
+        height,
+        count,
+        placed: 0,
+        floorLevel: group.floorLevel ?? null,
+      });
       continue;
     }
 
@@ -221,7 +231,13 @@ export function runLayout(
       );
     }
 
-    summaryGroups.push({ width, height, count, placed: placedInGroup });
+    summaryGroups.push({
+      width,
+      height,
+      count,
+      placed: placedInGroup,
+      floorLevel: group.floorLevel ?? null,
+    });
 
     // Advance cursor_y between groups
     if (maxRowHeight > 0) {

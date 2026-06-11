@@ -1,6 +1,9 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import { EventType } from '@prisma/client';
 import {
+  IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNumber,
@@ -9,7 +12,9 @@ import {
   IsUUID,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { SelectEventFloorDto } from './select-event-floor.dto';
 
 export class CreateEventDto {
   @ApiProperty({ example: 'Expo Tech 2025' })
@@ -50,4 +55,36 @@ export class CreateEventDto {
   @IsNumber()
   @Min(1)
   canvasHeight?: number;
+
+  @ApiPropertyOptional({
+    type: [SelectEventFloorDto],
+    description:
+      'Andares do pavilhão usados no evento. Ausente = andar default.',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => SelectEventFloorDto)
+  selectedFloors?: SelectEventFloorDto[];
+
+  @ApiPropertyOptional({
+    example: true,
+    default: true,
+    description:
+      'Permite alterar width/height dos EventFloors depois do evento criado.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  allowFloorDimensionChanges?: boolean;
+
+  @ApiPropertyOptional({
+    example: 1500,
+    nullable: true,
+    description:
+      'Preço padrão usado quando um allotment for criado sem price.',
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  defaultAllotmentPrice?: number | null;
 }

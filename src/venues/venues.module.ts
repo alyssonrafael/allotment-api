@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { VenuesController } from './venues.controller';
+import { VenueFloorsController, VenuesController } from './venues.controller';
 import { VenuesService } from './venues.service';
 
 @Module({
-  controllers: [VenuesController],
+  controllers: [VenuesController, VenueFloorsController],
   providers: [VenuesService],
   exports: [VenuesService],
 })

@@ -35,6 +35,20 @@ export class ParseVenueDto {
 const nullableString = { anyOf: [{ type: 'null' }, { type: 'string' }] };
 const nullableNumber = { anyOf: [{ type: 'null' }, { type: 'number' }] };
 
+const venueFloorSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['name', 'level', 'width', 'height', 'sortOrder', 'isDefault'],
+  properties: {
+    name: { type: 'string' },
+    level: { type: 'integer', minimum: 0 },
+    width: { type: 'number' },
+    height: { type: 'number' },
+    sortOrder: { type: 'integer', minimum: 0 },
+    isDefault: { type: 'boolean' },
+  },
+};
+
 // OpenAI strict-mode JSON Schema for parse-venue.
 // Suporta dois estados via "status": complete (venue preenchido) e needs_info
 // (questions + collected + assistantMessage). Campos anuláveis usam anyOf.
@@ -71,6 +85,7 @@ export const PARSE_VENUE_SCHEMA = {
             'zipCode',
             'accent',
             'photo',
+            'floors',
           ],
           properties: {
             name: { type: 'string' },
@@ -84,6 +99,7 @@ export const PARSE_VENUE_SCHEMA = {
             zipCode: nullableString,
             accent: { type: 'string' },
             photo: { type: 'string' },
+            floors: { type: 'array', items: venueFloorSchema },
           },
         },
       ],
@@ -134,6 +150,7 @@ export const PARSE_VENUE_SCHEMA = {
         'zipCode',
         'accent',
         'photo',
+        'floors',
       ],
       properties: {
         name: nullableString,
@@ -147,6 +164,7 @@ export const PARSE_VENUE_SCHEMA = {
         zipCode: nullableString,
         accent: nullableString,
         photo: nullableString,
+        floors: { type: 'array', items: venueFloorSchema },
       },
     },
     assistantMessage: { type: 'string' },
@@ -165,6 +183,16 @@ export interface ParsedVenue {
   zipCode: string | null;
   accent: string;
   photo: string;
+  floors: ParsedVenueFloor[];
+}
+
+export interface ParsedVenueFloor {
+  name: string;
+  level: number;
+  width: number;
+  height: number;
+  sortOrder: number;
+  isDefault: boolean;
 }
 
 export interface SuggestedEvent {
