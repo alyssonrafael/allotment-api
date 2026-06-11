@@ -3,11 +3,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ActivityType, Allotment } from '@prisma/client';
+import { ActivityType } from '@prisma/client';
 import { ActivitiesService } from '../activities/activities.service';
 import { EventsService } from '../events/events.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { BulkCreateAllotmentsDto } from './dto/bulk-create-allotments.dto';
 import { CreateAllotmentDto } from './dto/create-allotment.dto';
+import { UpdateAllotmentFloorDto } from './dto/update-allotment-floor.dto';
 import { UpdateAllotmentDto } from './dto/update-allotment.dto';
 import { UpdateAllotmentPositionDto } from './dto/update-allotment-position.dto';
 import { UpdateAllotmentStatusDto } from './dto/update-allotment-status.dto';
@@ -29,6 +31,9 @@ export class AllotmentsService {
 
   async create(eventId: string, dto: CreateAllotmentDto) {
     const event = await this.eventsService.findOne(eventId);
+    const eventFloor = this.resolveEventFloor(event, dto.eventFloorId);
+    const price = dto.price ?? event.defaultAllotmentPrice ?? 0;
+    const candidate = { ...dto, price };
 
     const existing = await this.prisma.allotment.findUnique({
       where: { eventId_code: { eventId, code: dto.code } },
@@ -39,15 +44,16 @@ export class AllotmentsService {
       );
     }
 
-    this.validateBounds(dto, event);
+    this.validateBounds(candidate, eventFloor);
 
     const allotments = await this.prisma.allotment.findMany({
-      where: { eventId },
+      where: { eventFloorId: eventFloor.id },
     });
-    this.validateCollision(dto, allotments);
+    this.validateCollision(candidate, allotments);
 
+    const { eventFloorId: _eventFloorId, ...data } = dto;
     const allotment = await this.prisma.allotment.create({
-      data: { ...dto, eventId },
+      data: { ...data, price, eventId, eventFloorId: eventFloor.id },
     });
     await this.activitiesService.log(
       eventId,
@@ -57,9 +63,60 @@ export class AllotmentsService {
     return allotment;
   }
 
-  findAllByEvent(eventId: string) {
+  async bulkCreate(eventId: string, dto: BulkCreateAllotmentsDto) {
+    const event = await this.eventsService.findOne(eventId);
+    const codes = new Set<string>();
+    const prepared = dto.allotments.map((item) => {
+      if (codes.has(item.code)) {
+        throw new ConflictException(`Code "${item.code}" is duplicated in payload`);
+      }
+      codes.add(item.code);
+      const eventFloor = this.resolveEventFloor(event, item.eventFloorId);
+      const price = item.price ?? event.defaultAllotmentPrice ?? 0;
+      const candidate = { ...item, price };
+      this.validateBounds(candidate, eventFloor);
+      const { eventFloorId: _eventFloorId, ...data } = item;
+      return { ...data, price, eventId, eventFloorId: eventFloor.id };
+    });
+
+    const existingCodes = await this.prisma.allotment.findMany({
+      where: { eventId, code: { in: Array.from(codes) } },
+      select: { code: true },
+    });
+    if (existingCodes.length > 0) {
+      throw new ConflictException(
+        `Code "${existingCodes[0].code}" already exists in this event`,
+      );
+    }
+
+    for (const eventFloorId of new Set(prepared.map((item) => item.eventFloorId))) {
+      const existing = await this.prisma.allotment.findMany({
+        where: { eventFloorId },
+      });
+      const candidates = prepared.filter((item) => item.eventFloorId === eventFloorId);
+      candidates.forEach((candidate, index) => {
+        this.validateCollision(candidate, [
+          ...existing,
+          ...candidates.slice(0, index),
+        ]);
+      });
+    }
+
+    const created = await this.prisma.$transaction(
+      prepared.map((data) => this.prisma.allotment.create({ data })),
+    );
+    await this.activitiesService.log(
+      eventId,
+      `${created.length} lote(s) foram criados`,
+      ActivityType.CREATED,
+    );
+    return created;
+  }
+
+  async findAllByEvent(eventId: string, eventFloorId?: string) {
+    await this.eventsService.findOne(eventId);
     return this.prisma.allotment.findMany({
-      where: { eventId },
+      where: { eventId, ...(eventFloorId ? { eventFloorId } : {}) },
       orderBy: { createdAt: 'asc' },
     });
   }
@@ -73,6 +130,10 @@ export class AllotmentsService {
   async update(id: string, dto: UpdateAllotmentDto) {
     const allotment = await this.findOne(id);
     const event = await this.eventsService.findOne(allotment.eventId);
+    const eventFloor = this.resolveEventFloor(
+      event,
+      dto.eventFloorId ?? allotment.eventFloorId,
+    );
 
     const candidate = {
       x: dto.x ?? allotment.x,
@@ -81,10 +142,10 @@ export class AllotmentsService {
       height: dto.height ?? allotment.height,
     };
 
-    this.validateBounds(candidate, event);
+    this.validateBounds(candidate, eventFloor);
 
     const siblings = await this.prisma.allotment.findMany({
-      where: { eventId: allotment.eventId, id: { not: id } },
+      where: { eventFloorId: eventFloor.id, id: { not: id } },
     });
     this.validateCollision(candidate, siblings);
 
@@ -103,15 +164,16 @@ export class AllotmentsService {
   async updatePosition(id: string, dto: UpdateAllotmentPositionDto) {
     const allotment = await this.findOne(id);
     const event = await this.eventsService.findOne(allotment.eventId);
+    const eventFloor = this.resolveEventFloor(event, allotment.eventFloorId);
     const candidate = {
       x: dto.x,
       y: dto.y,
       width: allotment.width,
       height: allotment.height,
     };
-    this.validateBounds(candidate, event);
+    this.validateBounds(candidate, eventFloor);
     const siblings = await this.prisma.allotment.findMany({
-      where: { eventId: allotment.eventId, id: { not: id } },
+      where: { eventFloorId: eventFloor.id, id: { not: id } },
     });
     this.validateCollision(candidate, siblings);
     const updated = await this.prisma.allotment.update({
@@ -121,6 +183,33 @@ export class AllotmentsService {
     await this.activitiesService.log(
       allotment.eventId,
       `Lote "${allotment.code}" teve posição ajustada`,
+      ActivityType.UPDATED,
+    );
+    return updated;
+  }
+
+  async updateFloor(id: string, dto: UpdateAllotmentFloorDto) {
+    const allotment = await this.findOne(id);
+    const event = await this.eventsService.findOne(allotment.eventId);
+    const eventFloor = this.resolveEventFloor(event, dto.eventFloorId);
+    const candidate = {
+      x: allotment.x,
+      y: allotment.y,
+      width: allotment.width,
+      height: allotment.height,
+    };
+    this.validateBounds(candidate, eventFloor);
+    const siblings = await this.prisma.allotment.findMany({
+      where: { eventFloorId: eventFloor.id, id: { not: id } },
+    });
+    this.validateCollision(candidate, siblings);
+    const updated = await this.prisma.allotment.update({
+      where: { id },
+      data: { eventFloorId: eventFloor.id },
+    });
+    await this.activitiesService.log(
+      allotment.eventId,
+      `Lote "${allotment.code}" foi movido de andar`,
       ActivityType.UPDATED,
     );
     return updated;
@@ -154,21 +243,21 @@ export class AllotmentsService {
 
   private validateBounds(
     a: { x: number; y: number; width: number; height: number },
-    event: { canvasWidth: number; canvasHeight: number },
+    eventFloor: { width: number; height: number },
   ) {
     if (
       a.x < 0 ||
       a.y < 0 ||
-      a.x + a.width > event.canvasWidth ||
-      a.y + a.height > event.canvasHeight
+      a.x + a.width > eventFloor.width ||
+      a.y + a.height > eventFloor.height
     ) {
-      throw new ConflictException('Allotment exceeds canvas boundaries');
+      throw new ConflictException('Allotment exceeds floor boundaries');
     }
   }
 
   private validateCollision(
     a: { x: number; y: number; width: number; height: number },
-    others: Allotment[],
+    others: Array<{ x: number; y: number; width: number; height: number }>,
   ) {
     const collides = others.some(
       (b) =>
@@ -179,5 +268,21 @@ export class AllotmentsService {
     );
     if (collides)
       throw new ConflictException('Allotment collides with an existing stand');
+  }
+
+  private resolveEventFloor(
+    event: { eventFloors?: Array<{ id: string; width: number; height: number }> },
+    eventFloorId?: string,
+  ) {
+    const eventFloors = event.eventFloors ?? [];
+    if (eventFloorId) {
+      const eventFloor = eventFloors.find((floor) => floor.id === eventFloorId);
+      if (!eventFloor) {
+        throw new ConflictException('eventFloorId does not belong to this event');
+      }
+      return eventFloor;
+    }
+    if (eventFloors.length === 1) return eventFloors[0];
+    throw new ConflictException('eventFloorId is required for events with multiple floors');
   }
 }

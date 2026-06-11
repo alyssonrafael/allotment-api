@@ -4,10 +4,10 @@ import {
   IsArray,
   IsNumber,
   IsOptional,
-  IsPositive,
   IsString,
   IsUUID,
   Length,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { LayoutIntent, PlacedStand } from '../layout.engine';
@@ -30,19 +30,21 @@ export class ParseEventDto {
 
   @ApiProperty({
     example: 50,
-    description: 'Largura disponível do canvas em metros',
+    description: 'Legado: largura disponível do canvas em metros',
   })
+  @IsOptional()
   @IsNumber()
-  @IsPositive()
-  canvasWidth!: number;
+  @Min(1)
+  canvasWidth?: number;
 
   @ApiProperty({
     example: 35,
-    description: 'Altura disponível do canvas em metros',
+    description: 'Legado: altura disponível do canvas em metros',
   })
+  @IsOptional()
   @IsNumber()
-  @IsPositive()
-  canvasHeight!: number;
+  @Min(1)
+  canvasHeight?: number;
 
   @ApiPropertyOptional({
     type: [MessageDto],
@@ -58,6 +60,18 @@ export class ParseEventDto {
 
 const nullableString = { anyOf: [{ type: 'null' }, { type: 'string' }] };
 const nullableNumber = { anyOf: [{ type: 'null' }, { type: 'number' }] };
+
+const selectedFloorSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['venueFloorId', 'level', 'width', 'height'],
+  properties: {
+    venueFloorId: { type: 'string' },
+    level: { type: 'integer', minimum: 0 },
+    width: { type: 'number' },
+    height: { type: 'number' },
+  },
+};
 
 // OpenAI strict-mode JSON Schema for parse-event.
 // Suporta dois estados via "status": complete (event + layoutIntent) e needs_info.
@@ -89,6 +103,7 @@ export const PARSE_EVENT_SCHEMA = {
             'endDate',
             'canvasWidth',
             'canvasHeight',
+            'selectedFloors',
           ],
           properties: {
             name: { type: 'string' },
@@ -100,6 +115,7 @@ export const PARSE_EVENT_SCHEMA = {
             endDate: { type: 'string' },
             canvasWidth: { type: 'number' },
             canvasHeight: { type: 'number' },
+            selectedFloors: { type: 'array', items: selectedFloorSchema },
           },
         },
       ],
@@ -125,13 +141,21 @@ export const PARSE_EVENT_SCHEMA = {
               items: {
                 type: 'object',
                 additionalProperties: false,
-                required: ['width', 'height', 'count', 'label', 'pricePerSqm'],
+                required: [
+                  'width',
+                  'height',
+                  'count',
+                  'label',
+                  'pricePerSqm',
+                  'floorLevel',
+                ],
                 properties: {
                   width: { type: 'integer', minimum: 1 },
                   height: { type: 'integer', minimum: 1 },
                   count: { type: 'integer', minimum: 1 },
                   label: nullableString,
                   pricePerSqm: nullableNumber,
+                  floorLevel: nullableNumber,
                 },
               },
             },
@@ -191,6 +215,14 @@ export interface ParsedEvent {
   endDate: string;
   canvasWidth: number;
   canvasHeight: number;
+  selectedFloors: ParsedEventFloor[];
+}
+
+export interface ParsedEventFloor {
+  venueFloorId: string;
+  level: number;
+  width: number;
+  height: number;
 }
 
 export interface ParsedEventCollected {
@@ -213,6 +245,7 @@ export interface ParseEventComplete {
       height: number;
       count: number;
       placed: number;
+      floorLevel?: number | null;
     }>;
   };
   warnings: string[];

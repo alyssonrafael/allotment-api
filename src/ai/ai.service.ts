@@ -18,6 +18,7 @@ import {
   PARSE_EVENT_SCHEMA,
   ParseEventResponse,
   ParsedEventCollected,
+  ParsedEventFloor,
   RawParseEventResponse,
 } from './dto/parse-event.dto';
 import { runLayout } from './layout.engine';
@@ -94,8 +95,13 @@ se mencionado, de um evento inicial.
 
 Retorne SOMENTE JSON válido seguindo o schema fornecido.
 
-Dados OBRIGATÓRIOS do pavilhão (nunca invente): name, city, state, width, height.
+Dados OBRIGATÓRIOS do pavilhão (nunca invente): name, city, state e dimensões.
 Dados OPCIONAIS (pode assumir null sem perguntar): street, neighborhood, zipCode, description.
+Andares:
+- Se o usuário informar vários andares, preencha "floors" com cada andar e suas dimensões.
+- Se disser que há vários andares mas não informar as dimensões de todos, retorne "needs_info" perguntando as dimensões faltantes.
+- Se houver apenas uma dimensão geral do pavilhão, crie um único andar "Térreo", level 0, sortOrder 0, isDefault true.
+- Só um andar pode ter isDefault true; use o Térreo/default quando existir.
 
 CORES — Presets disponíveis (use o mais próximo do que o usuário pediu):
 - "azul": accent="#2563eb"
@@ -121,14 +127,15 @@ ${OUT_OF_CONTEXT_RULE}`;
 }
 
 function buildSystemPromptEvent(
-  canvasWidth: number,
-  canvasHeight: number,
+  floorsDescription: string,
   currentDate: string,
 ): string {
   return `Você é um assistente especializado em layout de feiras e exposições.
 Extraia do texto do usuário as informações de um evento e, opcionalmente, o layout de stands.
 
-O canvas disponível é de ${canvasWidth}m × ${canvasHeight}m.
+Andares disponíveis do pavilhão:
+${floorsDescription}
+
 IMPORTANTE: Você NÃO precisa calcular coordenadas — apenas extraia a intenção do layout.
 O posicionamento será calculado por um algoritmo separado.
 
@@ -138,6 +145,9 @@ PASSO 1 — Colete os dados obrigatórios do evento: name, type, startDate, endD
   Se qualquer um faltar, retorne "needs_info" pedindo apenas o que falta.
 
 PASSO 2 — Quando os 4 dados do evento estiverem disponíveis:
+  - Extraia quais andares do pavilhão serão usados em event.selectedFloors.
+  - Se o usuário não mencionar andares, selecione apenas o andar default/térreo.
+  - Se mencionar andares que não existem na lista disponível, retorne "needs_info" perguntando quais andares disponíveis deseja usar.
   - Se o usuário JÁ informou dados de stands (quantidade, tamanho ou qualquer menção a lotes)
     no prompt atual ou no histórico → vá para o PASSO 3a.
   - Se o usuário NÃO mencionou nada sobre stands nem dispensou → retorne "needs_info" com:
@@ -163,7 +173,13 @@ Mas SE houver stands, o valor padrão por stand (basePrice) passa a ser OBRIGAT�
 
 Quando status for "complete" COM stands, retorne layoutIntent com:
 - groups: lista de grupos de stands
+- floorLevel em cada grupo quando o usuário disser em qual andar o grupo fica; se houver só um andar selecionado, use o level dele.
 - basePrice: o valor padrão por stand informado pelo usuário (número > 0; NUNCA null quando há stands)
+
+ANDARES DOS STANDS:
+- Se houver vários andares selecionados e algum grupo de stands não tiver andar claro, retorne "needs_info" perguntando em qual andar distribuir esses stands.
+- Se houver só um andar selecionado, todos os grupos sem andar explícito usam esse andar.
+- Use floorLevel igual ao level do andar disponível. Nunca invente levels.
 
 TAMANHOS DIFERENTES — múltiplos grupos:
 - Cada tamanho distinto de stand é UM grupo separado no array "groups", com seu próprio width, height e count.
@@ -239,6 +255,12 @@ function stripNulls<T extends object>(obj: T): Partial<T> {
   return out;
 }
 
+function generateAiCode(index: number): string {
+  const letter = String.fromCharCode(65 + Math.floor(index / 26));
+  const num = (index % 26) + 1;
+  return `${letter}-${String(num).padStart(2, '0')}`;
+}
+
 @Injectable()
 export class AiService {
   constructor(
@@ -280,13 +302,20 @@ export class AiService {
       };
     }
 
-    if (!raw.venue || raw.venue.width <= 0 || raw.venue.height <= 0) {
+    if (!raw.venue) {
       throw new UnprocessableEntityException(
         'Não foi possível extrair dimensões válidas do pavilhão a partir do prompt',
       );
     }
 
     const warnings: string[] = [];
+    raw.venue.floors = this.normalizeVenueFloors(raw.venue, warnings);
+    const defaultFloor =
+      raw.venue.floors.find((floor) => floor.isDefault) ?? raw.venue.floors[0];
+    if (!raw.venue.width || raw.venue.width <= 0) raw.venue.width = defaultFloor.width;
+    if (!raw.venue.height || raw.venue.height <= 0)
+      raw.venue.height = defaultFloor.height;
+
     const normalizedWidth = normalizeDimension(raw.venue.width);
     if (normalizedWidth !== raw.venue.width) {
       warnings.push(
@@ -337,10 +366,15 @@ export class AiService {
 
     const venue = await this.prisma.venue.findUnique({
       where: { id: dto.venueId },
+      include: { floors: { orderBy: { sortOrder: 'asc' } } },
     });
     if (!venue) throw new NotFoundException(`Venue ${dto.venueId} not found`);
 
-    if (dto.canvasWidth > venue.width || dto.canvasHeight > venue.height) {
+    if (
+      dto.canvasWidth &&
+      dto.canvasHeight &&
+      (dto.canvasWidth > venue.width || dto.canvasHeight > venue.height)
+    ) {
       throw new BadRequestException(
         `Canvas (${dto.canvasWidth}x${dto.canvasHeight}) excede as dimensões do pavilhão (${venue.width}x${venue.height})`,
       );
@@ -357,8 +391,7 @@ export class AiService {
       {
         role: 'system',
         content: buildSystemPromptEvent(
-          dto.canvasWidth,
-          dto.canvasHeight,
+          this.describeVenueFloors(venue.floors),
           currentDate,
         ),
       },
@@ -388,8 +421,21 @@ export class AiService {
       );
     }
 
-    const start = new Date(raw.event.startDate);
-    const end = new Date(raw.event.endDate);
+    const selectedFloors = this.resolveParsedEventFloors(
+      venue.floors,
+      raw.event.selectedFloors,
+      dto.canvasWidth,
+      dto.canvasHeight,
+    );
+    const event = {
+      ...raw.event,
+      selectedFloors,
+      canvasWidth: selectedFloors[0].width,
+      canvasHeight: selectedFloors[0].height,
+    };
+
+    const start = new Date(event.startDate);
+    const end = new Date(event.endDate);
     if (isNaN(start.getTime()) || isNaN(end.getTime()) || end < start) {
       throw new UnprocessableEntityException(
         'Data de término deve ser posterior à data de início do evento',
@@ -400,11 +446,7 @@ export class AiService {
     if (!raw.layoutIntent || (raw.layoutIntent.groups?.length ?? 0) === 0) {
       return {
         status: 'complete',
-        event: {
-          ...raw.event,
-          canvasWidth: dto.canvasWidth,
-          canvasHeight: dto.canvasHeight,
-        },
+        event,
         allotments: [],
         summary: { total: 0, placed: 0, discarded: 0, groups: [] },
         warnings: [],
@@ -424,32 +466,80 @@ export class AiService {
         status: 'needs_info',
         questions: ['Qual o valor padrão de cada stand? (ex: 1000)'],
         collected: {
-          name: raw.event.name,
-          type: raw.event.type,
-          startDate: raw.event.startDate,
-          endDate: raw.event.endDate,
+          name: event.name,
+          type: event.type,
+          startDate: event.startDate,
+          endDate: event.endDate,
         },
         assistantMessage:
           'Quase lá! Para criar os stands preciso de um valor padrão por stand (ex: R$ 1.000). Você poderá ajustar individualmente depois.',
       };
     }
 
-    const layoutResult = runLayout(
-      raw.layoutIntent,
-      dto.canvasWidth,
-      dto.canvasHeight,
-    );
+    const selectedLevels = new Set(selectedFloors.map((floor) => floor.level));
+    const groups = raw.layoutIntent.groups.map((group) => {
+      if (group.floorLevel == null && selectedFloors.length === 1) {
+        return { ...group, floorLevel: selectedFloors[0].level };
+      }
+      if (group.floorLevel == null) {
+        throw new BadRequestException(
+          'floorLevel is required when multiple floors are selected',
+        );
+      }
+      if (!selectedLevels.has(group.floorLevel)) {
+        throw new BadRequestException('layoutIntent references an unselected floor');
+      }
+      return group;
+    });
+
+    const layoutResults = selectedFloors.map((floor) => {
+      const floorGroups = groups.filter((group) => group.floorLevel === floor.level);
+      if (floorGroups.length === 0) {
+        return {
+          allotments: [],
+          summary: { total: 0, placed: 0, discarded: 0, groups: [] },
+          warnings: [],
+        };
+      }
+      const result = runLayout(
+        { ...raw.layoutIntent!, groups: floorGroups },
+        floor.width,
+        floor.height,
+      );
+      return {
+        ...result,
+        allotments: result.allotments.map((allotment) => ({
+          ...allotment,
+          venueFloorId: floor.venueFloorId,
+          floorLevel: floor.level,
+        })),
+      };
+    });
+
+    const allotments = layoutResults
+      .flatMap((result) => result.allotments)
+      .map((allotment, index) => {
+        const code = generateAiCode(index);
+        return { ...allotment, code, name: `Stand ${code}` };
+      });
 
     return {
       status: 'complete',
-      event: {
-        ...raw.event,
-        canvasWidth: dto.canvasWidth,
-        canvasHeight: dto.canvasHeight,
+      event,
+      allotments,
+      summary: {
+        total: layoutResults.reduce((sum, result) => sum + result.summary.total, 0),
+        placed: layoutResults.reduce(
+          (sum, result) => sum + result.summary.placed,
+          0,
+        ),
+        discarded: layoutResults.reduce(
+          (sum, result) => sum + result.summary.discarded,
+          0,
+        ),
+        groups: layoutResults.flatMap((result) => result.summary.groups),
       },
-      allotments: layoutResult.allotments,
-      summary: layoutResult.summary,
-      warnings: layoutResult.warnings,
+      warnings: layoutResults.flatMap((result) => result.warnings),
       missing: raw.missing ?? [],
     };
   }
@@ -464,5 +554,144 @@ export class AiService {
       cleaned.photo = preset.photo;
     }
     return cleaned;
+  }
+
+  private normalizeVenueFloors(
+    venue: ParsedVenue,
+    warnings: string[],
+  ): ParsedVenue['floors'] {
+    const floors =
+      venue.floors?.length > 0
+        ? venue.floors
+        : [
+            {
+              name: 'Térreo',
+              level: 0,
+              width: venue.width,
+              height: venue.height,
+              sortOrder: 0,
+              isDefault: true,
+            },
+          ];
+
+    const levels = new Set<number>();
+    const defaults = floors.filter((floor) => floor.isDefault);
+    if (defaults.length > 1) {
+      throw new UnprocessableEntityException(
+        'A IA retornou mais de um andar padrão para o pavilhão',
+      );
+    }
+
+    const defaultLevel =
+      defaults[0]?.level ?? floors.find((floor) => floor.level === 0)?.level ?? floors[0].level;
+
+    return floors.map((floor, index) => {
+      if (levels.has(floor.level)) {
+        throw new UnprocessableEntityException(
+          'A IA retornou andares com level duplicado',
+        );
+      }
+      levels.add(floor.level);
+
+      const width = normalizeDimension(floor.width);
+      const height = normalizeDimension(floor.height);
+      if (width !== floor.width) {
+        warnings.push(
+          `Largura do andar ${floor.name} ${floor.width}m ajustada para ${width}m (apenas medidas inteiras).`,
+        );
+      }
+      if (height !== floor.height) {
+        warnings.push(
+          `Comprimento do andar ${floor.name} ${floor.height}m ajustado para ${height}m (apenas medidas inteiras).`,
+        );
+      }
+
+      return {
+        ...floor,
+        width,
+        height,
+        sortOrder: floor.sortOrder ?? index,
+        isDefault: floor.level === defaultLevel,
+      };
+    });
+  }
+
+  private describeVenueFloors(
+    floors: Array<{
+      id: string;
+      name: string;
+      level: number;
+      width: number;
+      height: number;
+      isDefault: boolean;
+    }>,
+  ): string {
+    return floors
+      .map(
+        (floor) =>
+          `- ${floor.name}: venueFloorId=${floor.id}, level=${floor.level}, dimensões=${floor.width}x${floor.height}m${
+            floor.isDefault ? ', default' : ''
+          }`,
+      )
+      .join('\n');
+  }
+
+  private resolveParsedEventFloors(
+    venueFloors: Array<{
+      id: string;
+      name: string;
+      level: number;
+      width: number;
+      height: number;
+      isDefault: boolean;
+    }>,
+    selectedFloors: ParsedEventFloor[] | undefined,
+    legacyCanvasWidth?: number,
+    legacyCanvasHeight?: number,
+  ): ParsedEventFloor[] {
+    const selected =
+      selectedFloors?.length
+        ? selectedFloors
+        : [
+            {
+              venueFloorId:
+                venueFloors.find((floor) => floor.isDefault)?.id ??
+                venueFloors[0].id,
+              level:
+                venueFloors.find((floor) => floor.isDefault)?.level ??
+                venueFloors[0].level,
+              width:
+                legacyCanvasWidth ??
+                venueFloors.find((floor) => floor.isDefault)?.width ??
+                venueFloors[0].width,
+              height:
+                legacyCanvasHeight ??
+                venueFloors.find((floor) => floor.isDefault)?.height ??
+                venueFloors[0].height,
+            },
+          ];
+
+    const ids = new Set<string>();
+    return selected.map((input) => {
+      if (ids.has(input.venueFloorId)) {
+        throw new BadRequestException('selectedFloors cannot contain duplicates');
+      }
+      ids.add(input.venueFloorId);
+      const venueFloor = venueFloors.find((floor) => floor.id === input.venueFloorId);
+      if (!venueFloor) {
+        throw new BadRequestException('selectedFloors must belong to the venue');
+      }
+      const width = normalizeDimension(input.width ?? venueFloor.width);
+      const height = normalizeDimension(input.height ?? venueFloor.height);
+      if (width > venueFloor.width || height > venueFloor.height) {
+        throw new BadRequestException('Selected floor exceeds venue floor dimensions');
+      }
+      return {
+        venueFloorId: venueFloor.id,
+        level: venueFloor.level,
+        width,
+        height,
+      };
+    });
   }
 }

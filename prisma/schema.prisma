@@ -43,9 +43,27 @@ model Venue {
   zipCode      String?
   accent       String
   photo        String
+  floors       VenueFloor[]
   events       Event[]
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+}
+
+model VenueFloor {
+  id         String       @id @default(uuid())
+  venueId    String
+  venue      Venue        @relation(fields: [venueId], references: [id], onDelete: Cascade)
+  name       String
+  level      Int
+  width      Float
+  height     Float
+  sortOrder  Int          @default(0)
+  isDefault  Boolean      @default(false)
+  eventFloors EventFloor[]
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  @@unique([venueId, level])
 }
 
 model Event {
@@ -58,10 +76,31 @@ model Event {
   venue            Venue            @relation(fields: [venueId], references: [id])
   canvasWidth      Float
   canvasHeight     Float
+  allowFloorDimensionChanges Boolean @default(true)
+  defaultAllotmentPrice Float?
+  eventFloors      EventFloor[]
   allotments       Allotment[]
   recentActivities RecentActivity[]
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+}
+
+model EventFloor {
+  id           String       @id @default(uuid())
+  eventId      String
+  event        Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  venueFloorId String?
+  venueFloor   VenueFloor?  @relation(fields: [venueFloorId], references: [id], onDelete: SetNull)
+  name         String
+  level        Int
+  width        Float
+  height       Float
+  sortOrder    Int          @default(0)
+  allotments   Allotment[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([eventId, level])
 }
 
 model RecentActivity {
@@ -85,6 +124,8 @@ model Allotment {
   price     Float
   eventId   String
   event     Event           @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventFloorId String
+  eventFloor   EventFloor   @relation(fields: [eventFloorId], references: [id], onDelete: Cascade)
   createdAt DateTime        @default(now())
   updatedAt DateTime        @updatedAt
 

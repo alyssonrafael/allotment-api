@@ -9,6 +9,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -20,7 +21,9 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { AllotmentsService } from './allotments.service';
+import { BulkCreateAllotmentsDto } from './dto/bulk-create-allotments.dto';
 import { CreateAllotmentDto } from './dto/create-allotment.dto';
+import { UpdateAllotmentFloorDto } from './dto/update-allotment-floor.dto';
 import { UpdateAllotmentDto } from './dto/update-allotment.dto';
 import { UpdateAllotmentPositionDto } from './dto/update-allotment-position.dto';
 import { UpdateAllotmentStatusDto } from './dto/update-allotment-status.dto';
@@ -87,6 +90,20 @@ export class AllotmentsController {
     return this.allotmentsService.create(eventId, dto);
   }
 
+  @Post('events/:eventId/allotments/bulk')
+  @ApiCreatedResponse({
+    description: 'Allotments criados em lote',
+  })
+  @ApiConflictResponse({
+    description: 'Código duplicado, colisão ou limites excedidos',
+  })
+  bulkCreate(
+    @Param('eventId') eventId: string,
+    @Body() dto: BulkCreateAllotmentsDto,
+  ) {
+    return this.allotmentsService.bulkCreate(eventId, dto);
+  }
+
   @Get('events/:eventId/allotments')
   @ApiOkResponse({
     description: 'Lista de allotments do evento',
@@ -109,8 +126,11 @@ export class AllotmentsController {
       ],
     },
   })
-  findAllByEvent(@Param('eventId') eventId: string) {
-    return this.allotmentsService.findAllByEvent(eventId);
+  findAllByEvent(
+    @Param('eventId') eventId: string,
+    @Query('eventFloorId') eventFloorId?: string,
+  ) {
+    return this.allotmentsService.findAllByEvent(eventId, eventFloorId);
   }
 
   @Get('allotments/:id')
@@ -253,6 +273,16 @@ export class AllotmentsController {
   })
   updateStatus(@Param('id') id: string, @Body() dto: UpdateAllotmentStatusDto) {
     return this.allotmentsService.updateStatus(id, dto);
+  }
+
+  @Patch('allotments/:id/floor')
+  @ApiOkResponse({ description: 'Allotment movido para outro andar do evento' })
+  @ApiNotFoundResponse({ description: 'Allotment não encontrado' })
+  @ApiConflictResponse({
+    description: 'Andar inválido, canvas excedido ou colisão no destino',
+  })
+  updateFloor(@Param('id') id: string, @Body() dto: UpdateAllotmentFloorDto) {
+    return this.allotmentsService.updateFloor(id, dto);
   }
 
   @Delete('allotments/:id')

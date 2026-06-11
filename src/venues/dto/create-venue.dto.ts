@@ -1,12 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsNumber,
   IsOptional,
   IsString,
   Length,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { CreateVenueFloorDto } from './create-venue-floor.dto';
 
 export class CreateVenueDto {
   @ApiProperty({ example: 'Pavilhão Norte' })
@@ -19,15 +23,23 @@ export class CreateVenueDto {
   @IsString()
   description?: string;
 
-  @ApiProperty({ example: 100 })
+  @ApiPropertyOptional({
+    example: 100,
+    description: 'Dimensão legada usada para criar o Térreo quando floors não vier.',
+  })
+  @IsOptional()
   @IsNumber()
   @Min(1)
-  width!: number;
+  width?: number;
 
-  @ApiProperty({ example: 60 })
+  @ApiPropertyOptional({
+    example: 60,
+    description: 'Dimensão legada usada para criar o Térreo quando floors não vier.',
+  })
+  @IsOptional()
   @IsNumber()
   @Min(1)
-  height!: number;
+  height?: number;
 
   @ApiProperty({ example: 'São Paulo' })
   @IsString()
@@ -69,4 +81,11 @@ export class CreateVenueDto {
   })
   @IsString()
   photo!: string;
+
+  @ApiPropertyOptional({ type: [CreateVenueFloorDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateVenueFloorDto)
+  floors?: CreateVenueFloorDto[];
 }
